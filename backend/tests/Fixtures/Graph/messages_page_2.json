@@ -1,0 +1,30 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('careers%40nckenya.go.ke')/mailFolders('inbox')/messages",
+  "value": [
+    {
+      "id": "AAMkAGMockMessage002",
+      "internetMessageId": "<mock-message-2@nckenya.go.ke>",
+      "conversationId": "AAQkAGMockConversation002",
+      "subject": "Application for Registered Nurse - John Kamau",
+      "from": {
+        "emailAddress": {
+          "name": "John Kamau",
+          "address": "john.kamau@example.com"
+        }
+      },
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "name": "NCK Careers",
+            "address": "careers@nckenya.go.ke"
+          }
+        }
+      ],
+      "ccRecipients": [],
+      "receivedDateTime": "2026-08-09T14:22:00Z",
+      "hasAttachments": true,
+      "bodyPreview": "I hereby submit my application and supporting documents for the advertised position.",
+      "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkAGMockMessage002"
+    }
+  ]
+}

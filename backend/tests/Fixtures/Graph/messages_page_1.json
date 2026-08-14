@@ -1,0 +1,31 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('careers%40nckenya.go.ke')/mailFolders('inbox')/messages",
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/users/careers@nckenya.go.ke/mailFolders/inbox/messages?$top=1&$skip=1&skiptoken=page2",
+  "value": [
+    {
+      "id": "AAMkAGMockMessage001",
+      "internetMessageId": "<mock-message-1@nckenya.go.ke>",
+      "conversationId": "AAQkAGMockConversation001",
+      "subject": "Application for Nurse Tutor Position - Jane Doe",
+      "from": {
+        "emailAddress": {
+          "name": "Jane Doe",
+          "address": "jane.doe@example.com"
+        }
+      },
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "name": "NCK Careers",
+            "address": "careers@nckenya.go.ke"
+          }
+        }
+      ],
+      "ccRecipients": [],
+      "receivedDateTime": "2026-08-10T09:15:00Z",
+      "hasAttachments": true,
+      "bodyPreview": "Dear Sir/Madam, please find attached my application for the Nurse Tutor vacancy...",
+      "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkAGMockMessage001"
+    }
+  ]
+}

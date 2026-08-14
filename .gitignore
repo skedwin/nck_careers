@@ -1,0 +1,27 @@
+# NCK Careers monorepo
+.env
+.env.*.local
+!.env.example
+
+# Dependencies / builds
+**/node_modules/
+**/vendor/
+**/dist/
+**/build/
+**/public/hot
+**/public/storage
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs / caches
+*.log
+.phpunit.result.cache
+frontend/coverage/
+backend/storage/*.key
+backend/storage/pail
+backend/bootstrap/cache/*.php
+!backend/bootstrap/cache/.gitignore
