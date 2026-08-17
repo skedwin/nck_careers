@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDocument;
+use App\Services\Access\PositionScopeService;
 use App\Support\ApiResponse;
 use App\Support\NairobiDate;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +14,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
+    public function __construct(private readonly PositionScopeService $positionScope)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         $query = ApplicationDocument::query()
@@ -38,6 +43,13 @@ class DocumentController extends Controller
 
         if ($applicationId = $request->query('application_id')) {
             $query->where('application_id', $applicationId);
+        }
+
+        $allowed = $this->positionScope->allowedPositionIds();
+        if ($allowed !== null) {
+            $query->whereHas('application', function ($application) use ($allowed): void {
+                $application->whereIn('position_id', $allowed);
+            });
         }
 
         $paginator = $query->paginate((int) $request->query('per_page', 20));
@@ -71,6 +83,11 @@ class DocumentController extends Controller
 
     public function download(ApplicationDocument $document): StreamedResponse
     {
+        $document->loadMissing('application:id,position_id');
+        if ($document->application) {
+            $this->positionScope->assertCanAccessApplication($document->application);
+        }
+
         $disk = $document->disk ?: 'private';
         $path = $document->path;
 

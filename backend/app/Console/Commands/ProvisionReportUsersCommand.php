@@ -9,7 +9,7 @@ class ProvisionReportUsersCommand extends Command
 {
     protected $signature = 'users:provision-report-users';
 
-    protected $description = 'Create/update scoped report users (fsduser, commsuser, nusesuser)';
+    protected $description = 'Create/update scoped report users (fsduser, commsuser, nusesuser, officeuser)';
 
     public function handle(): int
     {

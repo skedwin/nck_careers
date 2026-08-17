@@ -9,6 +9,7 @@ import api, {
 } from '../lib/api';
 import { formatEAT, humanize } from '../lib/dates';
 import { downloadAuthorized } from '../lib/download';
+import { useAuth } from '../context/AuthContext';
 import { KENYA_COUNTIES } from '../lib/counties';
 
 const ACADEMIC_LEVELS = [
@@ -138,6 +139,10 @@ function relatedMatchesFilter(
 
 export default function ApplicationDetailPage() {
   const { id } = useParams();
+  const { user } = useAuth();
+  const canUpdate = user?.permissions?.includes('applications.update') ?? false;
+  const canEditProfile =
+    canUpdate || (user?.permissions?.includes('applications.profile.update') ?? false);
   const queryClient = useQueryClient();
   const [note, setNote] = useState('');
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -327,14 +332,16 @@ export default function ApplicationDetailPage() {
             .
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={hideDuplicateMutation.isPending}
-              onClick={() => hideDuplicateMutation.mutate({ application_id: app.id, unhide: true })}
-              className="rounded-xl border border-nck-green/20 bg-nck-greenLight px-3 py-2 text-sm font-semibold text-nck-green disabled:opacity-60"
-            >
-              Unhide this application
-            </button>
+            {canUpdate && (
+              <button
+                type="button"
+                disabled={hideDuplicateMutation.isPending}
+                onClick={() => hideDuplicateMutation.mutate({ application_id: app.id, unhide: true })}
+                className="rounded-xl border border-nck-green/20 bg-nck-greenLight px-3 py-2 text-sm font-semibold text-nck-green disabled:opacity-60"
+              >
+                Unhide this application
+              </button>
+            )}
             <Link
               to="/reports/hidden-duplicates"
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -377,7 +384,7 @@ export default function ApplicationDetailPage() {
                 .
               </p>
             </div>
-            {hideableDuplicates.length > 0 && (
+            {canUpdate && hideableDuplicates.length > 0 && (
               <button
                 type="button"
                 disabled={hideDuplicateMutation.isPending}
@@ -434,7 +441,7 @@ export default function ApplicationDetailPage() {
                 ? ` · ${hideableDuplicates.length} can be hidden (Unique Identifier kept)`
                 : ''}
             </p>
-            {hiddenInGroupCount > 0 && (
+            {canUpdate && hiddenInGroupCount > 0 && (
               <button
                 type="button"
                 onClick={() => setShowHiddenDuplicates((open) => !open)}
@@ -454,7 +461,7 @@ export default function ApplicationDetailPage() {
                     <th className="px-3 py-2">Email</th>
                     <th className="px-3 py-2">Phone</th>
                     <th className="px-3 py-2">Match</th>
-                    <th className="px-3 py-2">Action</th>
+                    {canUpdate && <th className="px-3 py-2">Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -475,21 +482,23 @@ export default function ApplicationDetailPage() {
                       <td className="px-3 py-2">{row.email ?? '—'}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{row.phone ?? '—'}</td>
                       <td className="px-3 py-2 text-slate-600">{row.match ?? '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <button
-                          type="button"
-                          disabled={hideDuplicateMutation.isPending}
-                          onClick={() =>
-                            hideDuplicateMutation.mutate({
-                              application_id: row.application_id,
-                              unhide: true,
-                            })
-                          }
-                          className="rounded-lg border border-nck-green/20 bg-nck-greenLight px-3 py-1.5 text-xs font-semibold text-nck-green disabled:opacity-60"
-                        >
-                          Unhide
-                        </button>
-                      </td>
+                      {canUpdate && (
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <button
+                            type="button"
+                            disabled={hideDuplicateMutation.isPending}
+                            onClick={() =>
+                              hideDuplicateMutation.mutate({
+                                application_id: row.application_id,
+                                unhide: true,
+                              })
+                            }
+                            className="rounded-lg border border-nck-green/20 bg-nck-greenLight px-3 py-1.5 text-xs font-semibold text-nck-green disabled:opacity-60"
+                          >
+                            Unhide
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -507,7 +516,7 @@ export default function ApplicationDetailPage() {
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-3 py-2">Hide</th>
+                  {canUpdate && <th className="px-3 py-2">Hide</th>}
                   <th className="px-3 py-2">Role</th>
                   <th className="px-3 py-2">Unique Identifier</th>
                   <th className="px-3 py-2">Applicant</th>
@@ -521,7 +530,7 @@ export default function ApplicationDetailPage() {
               <tbody>
                 {relatedDuplicates.length === 0 && (
                   <tr>
-                    <td className="px-3 py-4 text-slate-500" colSpan={9}>
+                    <td className="px-3 py-4 text-slate-500" colSpan={canUpdate ? 9 : 8}>
                       No duplicates match this filter.
                     </td>
                   </tr>
@@ -533,25 +542,27 @@ export default function ApplicationDetailPage() {
                       key={row.application_id}
                       className={`border-b border-slate-100 ${isCurrent ? 'bg-nck-mist/50' : ''}`}
                     >
-                      <td className="px-3 py-2">
-                        {row.is_primary ? (
-                          <span className="text-xs text-slate-400">—</span>
-                        ) : (
-                          <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                            <input
-                              type="checkbox"
-                              checked={false}
-                              disabled={hideDuplicateMutation.isPending}
-                              onChange={(event) => {
-                                if (event.target.checked) {
-                                  hideDuplicateMutation.mutate({ application_id: row.application_id });
-                                }
-                              }}
-                            />
-                            Hide
-                          </label>
-                        )}
-                      </td>
+                      {canUpdate && (
+                        <td className="px-3 py-2">
+                          {row.is_primary ? (
+                            <span className="text-xs text-slate-400">—</span>
+                          ) : (
+                            <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                              <input
+                                type="checkbox"
+                                checked={false}
+                                disabled={hideDuplicateMutation.isPending}
+                                onChange={(event) => {
+                                  if (event.target.checked) {
+                                    hideDuplicateMutation.mutate({ application_id: row.application_id });
+                                  }
+                                }}
+                              />
+                              Hide
+                            </label>
+                          )}
+                        </td>
+                      )}
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span
                           className={`text-xs font-semibold uppercase tracking-wide ${
@@ -636,6 +647,7 @@ export default function ApplicationDetailPage() {
         </div>
       </div>
 
+      {canUpdate && (
       <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">
         <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Update status</h3>
         <textarea
@@ -664,13 +676,14 @@ export default function ApplicationDetailPage() {
           </p>
         )}
       </div>
+      )}
 
       <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
             Extracted profile
           </h3>
-          {!editingProfile ? (
+          {canEditProfile && !editingProfile ? (
             <button
               type="button"
               className="rounded-xl border border-nck-green/20 bg-nck-greenLight px-3 py-1.5 text-sm font-semibold text-nck-green"
@@ -681,7 +694,7 @@ export default function ApplicationDetailPage() {
             >
               Edit profile
             </button>
-          ) : (
+          ) : canEditProfile && editingProfile ? (
             <div className="flex gap-2">
               <button
                 type="button"
@@ -703,7 +716,7 @@ export default function ApplicationDetailPage() {
                 {profileMutation.isPending ? 'Saving…' : 'Save'}
               </button>
             </div>
-          )}
+          ) : null}
         </div>
 
         {profileMutation.isError && (
@@ -712,7 +725,7 @@ export default function ApplicationDetailPage() {
           </p>
         )}
 
-        {editingProfile ? (
+        {canEditProfile && editingProfile ? (
           <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <label className="space-y-1">
               <span className="text-xs uppercase tracking-[0.12em] text-slate-500">Academic qualification</span>
@@ -965,7 +978,8 @@ export default function ApplicationDetailPage() {
               attached.
             </p>
           </div>
-          {!editingRemarks ? (
+          {!canEditProfile || !editingRemarks ? (
+            canEditProfile ? (
             <button
               type="button"
               className="rounded-xl border border-nck-green/20 bg-nck-greenLight px-3 py-1.5 text-sm font-semibold text-nck-green"
@@ -976,6 +990,7 @@ export default function ApplicationDetailPage() {
             >
               {app.notes ? 'Edit remarks' : 'Add remarks'}
             </button>
+            ) : null
           ) : (
             <div className="flex gap-2">
               <button
@@ -1007,7 +1022,7 @@ export default function ApplicationDetailPage() {
           </p>
         )}
 
-        {editingRemarks ? (
+        {canEditProfile && editingRemarks ? (
           <textarea
             value={remarksDraft}
             onChange={(e) => setRemarksDraft(e.target.value)}

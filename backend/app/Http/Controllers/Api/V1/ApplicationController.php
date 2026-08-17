@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationStatusHistory;
+use App\Services\Access\PositionScopeService;
 use App\Services\Applications\ApplicationIngestionService;
 use App\Services\Audit\AuditLogger;
 use App\Services\Reports\LongListingReportService;
@@ -31,6 +32,7 @@ class ApplicationController extends Controller
         private readonly ApplicationIngestionService $ingestion,
         private readonly AuditLogger $auditLogger,
         private readonly LongListingReportService $longListing,
+        private readonly PositionScopeService $positionScope,
     ) {
     }
 
@@ -63,6 +65,8 @@ class ApplicationController extends Controller
             $query->where('position_id', $positionId);
         }
 
+        $this->positionScope->scopeApplicationsQuery($query);
+
         $paginator = $query->paginate((int) $request->query('per_page', 20));
 
         $paginator->through(fn (Application $application) => $this->serializeList($application));
@@ -72,6 +76,8 @@ class ApplicationController extends Controller
 
     public function show(Application $application): JsonResponse
     {
+        $this->positionScope->assertCanAccessApplication($application);
+
         $application->load([
             'applicant',
             'position.criteria',
@@ -142,6 +148,8 @@ class ApplicationController extends Controller
 
     public function updateProfile(Request $request, Application $application): JsonResponse
     {
+        $this->positionScope->assertCanAccessApplication($application);
+
         $validated = $request->validate([
             'highest_qualification' => ['nullable', 'string', Rule::in(['phd', 'masters', 'bachelors', 'higher_diploma', 'diploma', 'certificate', 'kcse'])],
             'management_course' => ['nullable', 'string', Rule::in(['Yes', 'No'])],

@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             'applications.view',
             'applications.create',
             'applications.update',
+            'applications.profile.update',
             'applications.shortlist',
             'applications.reject',
             'documents.view',
@@ -61,6 +62,10 @@ class DatabaseSeeder extends Seeder
             ],
             'Report Viewer' => [
                 'reports.view',
+                'applications.view',
+                'applications.profile.update',
+                'documents.view',
+                'documents.download',
             ],
             'Auditor' => [
                 'applications.view', 'documents.view', 'audit.view', 'reports.view', 'settings.view',

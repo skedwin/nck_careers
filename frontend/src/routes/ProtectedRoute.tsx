@@ -2,11 +2,14 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function defaultPathForUser(permissions: string[] | undefined): string {
-  if (permissions?.includes('applications.view')) {
+  if (permissions?.includes('applications.view') && permissions.includes('applications.update')) {
     return '/dashboard';
   }
   if (permissions?.includes('reports.view')) {
     return '/reports';
+  }
+  if (permissions?.includes('applications.view')) {
+    return '/applications';
   }
 
   return '/dashboard';

@@ -2,6 +2,7 @@
 
 namespace App\Services\Access;
 
+use App\Models\Application;
 use App\Models\Position;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,6 +56,11 @@ class PositionScopeService
         if (! $this->canAccessPosition($positionId, $user)) {
             throw new AccessDeniedHttpException('You do not have access to reports for this position.');
         }
+    }
+
+    public function assertCanAccessApplication(Application $application, ?User $user = null): void
+    {
+        $this->assertCanAccessPosition($application->position_id, $user);
     }
 
     public function assertCanAccessCategoryKey(string $categoryKey, ?User $user = null): void

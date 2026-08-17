@@ -8,6 +8,7 @@ use App\Models\UserPositionScope;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -20,8 +21,24 @@ class ReportPositionUsersSeeder extends Seeder
     {
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
+        foreach ([
+            'reports.view',
+            'applications.view',
+            'applications.profile.update',
+            'documents.view',
+            'documents.download',
+        ] as $permission) {
+            Permission::findOrCreate($permission);
+        }
+
         $role = Role::findOrCreate('Report Viewer');
-        $role->syncPermissions(['reports.view']);
+        $role->syncPermissions([
+            'reports.view',
+            'applications.view',
+            'applications.profile.update',
+            'documents.view',
+            'documents.download',
+        ]);
 
         $users = [
             [
@@ -42,22 +59,34 @@ class ReportPositionUsersSeeder extends Seeder
                 'name' => 'Nursing Services Reports User',
                 'positions' => ['NCK/REC8', 'NCK/REC9', 'NCK/REC10'],
             ],
+            [
+                'username' => 'officeuser',
+                'email' => 'officeuser@nckenya.go.ke',
+                'name' => 'Office Reports User',
+                'positions' => ['NCK/REC11', 'NCK/REC12', 'NCK/REC13'],
+            ],
         ];
 
         $created = [];
 
         foreach ($users as $spec) {
-            $password = Str::password(16, symbols: true);
+            $existing = User::query()->where('email', $spec['email'])->first();
+            $password = $existing ? null : Str::password(16, symbols: true);
+
+            $attributes = [
+                'name' => $spec['name'],
+                'display_name' => $spec['username'],
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ];
+
+            if ($password !== null) {
+                $attributes['password'] = Hash::make($password);
+            }
 
             $user = User::query()->updateOrCreate(
                 ['email' => $spec['email']],
-                [
-                    'name' => $spec['name'],
-                    'display_name' => $spec['username'],
-                    'password' => Hash::make($password),
-                    'is_active' => true,
-                    'email_verified_at' => now(),
-                ]
+                $attributes
             );
 
             $user->syncRoles(['Report Viewer']);
@@ -80,7 +109,7 @@ class ReportPositionUsersSeeder extends Seeder
             $created[] = [
                 'username' => $spec['username'],
                 'email' => $spec['email'],
-                'password' => $password,
+                'password' => $password ?? '(unchanged)',
                 'positions' => $spec['positions'],
             ];
         }

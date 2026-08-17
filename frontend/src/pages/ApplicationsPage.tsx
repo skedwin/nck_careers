@@ -10,6 +10,7 @@ import api, {
   type LaravelPaginator,
 } from '../lib/api';
 import { formatEAT, humanize } from '../lib/dates';
+import { useAuth } from '../context/AuthContext';
 
 const STATUSES = [
   '',
@@ -23,6 +24,8 @@ const STATUSES = [
 ];
 
 export default function ApplicationsPage() {
+  const { user } = useAuth();
+  const canConvert = user?.permissions?.includes('applications.create') ?? false;
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
@@ -73,6 +76,7 @@ export default function ApplicationsPage() {
             Review applications converted from the careers mailbox and update their status.
           </p>
         </div>
+        {canConvert && (
         <button
           type="button"
           disabled={convertMutation.isPending}
@@ -81,6 +85,7 @@ export default function ApplicationsPage() {
         >
           {convertMutation.isPending ? 'Converting…' : 'Convert from mailbox'}
         </button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-3 rounded-2xl border border-nck-green/10 bg-white p-4">

@@ -73,7 +73,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/applications/{application}', [ApplicationController::class, 'show'])
             ->middleware('permission:applications.view');
         Route::put('/applications/{application}/profile', [ApplicationController::class, 'updateProfile'])
-            ->middleware('permission:applications.update');
+            ->middleware('permission:applications.update|applications.profile.update');
         Route::post('/applications/{application}/status', [ApplicationController::class, 'updateStatus'])
             ->middleware('permission:applications.update|applications.shortlist|applications.reject');
         Route::post('/applications/{application}/hide-duplicate', [ApplicationController::class, 'hideDuplicate'])
