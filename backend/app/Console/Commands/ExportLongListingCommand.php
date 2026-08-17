@@ -4,16 +4,17 @@ namespace App\Console\Commands;
 
 use App\Models\Position;
 use App\Services\Reports\LongListingReportService;
+use App\Support\Excel\NckReportExcel;
 use Illuminate\Console\Command;
 
 class ExportLongListingCommand extends Command
 {
     protected $signature = 'reports:long-listing-export
         {--position= : Position id or NCK/REC code}
-        {--path= : Output CSV path (default storage/app/private/reports)}
+        {--path= : Output Excel path (default storage/app/private/reports)}
         {--include-unassigned : Include unassigned applications when exporting all}';
 
-    protected $description = 'Export long listing CSV per vacancy category (or all)';
+    protected $description = 'Export long listing Excel (.xls) per vacancy category (or all)';
 
     public function handle(LongListingReportService $service): int
     {
@@ -48,27 +49,13 @@ class ExportLongListingCommand extends Command
 
         $stamp = now()->format('Ymd_His');
         $suffix = $positionId ? "position_{$positionId}" : 'all_categories';
-        $file = rtrim((string) $dir, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR."nck_long_listing_{$suffix}_{$stamp}.csv";
+        $file = rtrim((string) $dir, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR."nck_long_listing_{$suffix}_{$stamp}.xls";
 
-        $out = fopen($file, 'w');
-        if ($out === false) {
-            $this->error("Unable to write [{$file}].");
+        $path = (new NckReportExcel('Long listing', count($rows).' applicant row(s)'))
+            ->addSheet('Long listing', $headers, $rows)
+            ->save($file);
 
-            return self::FAILURE;
-        }
-
-        fwrite($out, "\xEF\xBB\xBF");
-        fputcsv($out, $headers);
-        foreach ($rows as $row) {
-            $line = [];
-            foreach ($headers as $header) {
-                $line[] = $row[$header] ?? '';
-            }
-            fputcsv($out, $line);
-        }
-        fclose($out);
-
-        $this->info("Exported ".count($rows)." row(s) to {$file}");
+        $this->info('Exported '.count($rows)." row(s) to {$path}");
 
         return self::SUCCESS;
     }

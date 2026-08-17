@@ -10,6 +10,7 @@ const navItems = [
   { to: '/shortlisting', label: 'Shortlisting' },
   { to: '/documents', label: 'Documents' },
   { to: '/mailbox', label: 'Mailbox' },
+  { to: '/myjobs', label: 'MyJobs' },
   { to: '/reports', label: 'Reports' },
   { to: '/users', label: 'Users' },
   { to: '/settings', label: 'Settings' },

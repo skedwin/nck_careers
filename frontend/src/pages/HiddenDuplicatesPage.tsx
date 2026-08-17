@@ -29,6 +29,15 @@ export default function HiddenDuplicatesPage() {
     },
   });
 
+  const invalidateAfterUnhide = () => {
+    setActionError(null);
+    void queryClient.invalidateQueries({ queryKey: ['reports-hidden-duplicates'] });
+    void queryClient.invalidateQueries({ queryKey: ['reports-long-listing'] });
+    void queryClient.invalidateQueries({ queryKey: ['reports-long-listing-category'] });
+    void queryClient.invalidateQueries({ queryKey: ['applications'] });
+    void queryClient.invalidateQueries({ queryKey: ['application'] });
+  };
+
   const unhideMutation = useMutation({
     mutationFn: async (applicationId: number) => {
       const response = await api.post<ApiSuccess<Application>>(
@@ -36,16 +45,30 @@ export default function HiddenDuplicatesPage() {
       );
       return response.data.data;
     },
-    onSuccess: () => {
-      setActionError(null);
-      void queryClient.invalidateQueries({ queryKey: ['reports-hidden-duplicates'] });
-      void queryClient.invalidateQueries({ queryKey: ['reports-long-listing'] });
-      void queryClient.invalidateQueries({ queryKey: ['reports-long-listing-category'] });
-      void queryClient.invalidateQueries({ queryKey: ['applications'] });
-      void queryClient.invalidateQueries({ queryKey: ['application'] });
-    },
+    onSuccess: invalidateAfterUnhide,
     onError: (error) => {
       setActionError(getApiError(error, 'Unable to unhide duplicate.'));
+    },
+  });
+
+  const unhideAllMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post<ApiSuccess<{ unhidden: number }>>(
+        '/applications/unhide-all-duplicates',
+      );
+      return response.data;
+    },
+    onSuccess: (payload) => {
+      invalidateAfterUnhide();
+      const count = payload.data?.unhidden ?? 0;
+      window.alert(
+        count === 0
+          ? 'No hidden duplicates to restore.'
+          : `${count} duplicate${count === 1 ? '' : 's'} restored to long listing.`,
+      );
+    },
+    onError: (error) => {
+      setActionError(getApiError(error, 'Unable to unhide all duplicates.'));
     },
   });
 
@@ -55,10 +78,10 @@ export default function HiddenDuplicatesPage() {
     try {
       await downloadAuthorized(
         '/reports/hidden-duplicates/export',
-        `nck_hidden_duplicates_${Date.now()}.csv`,
+        `nck_hidden_duplicates_${Date.now()}.xls`,
       );
     } catch (error) {
-      setExportError(getApiError(error, 'CSV export failed.'));
+      setExportError(getApiError(error, 'Excel export failed.'));
     } finally {
       setExporting(false);
     }
@@ -96,17 +119,37 @@ export default function HiddenDuplicatesPage() {
             {generatedAt ? ` · as of ${formatEAT(generatedAt)}` : ''}
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            These applications were hidden from long listing. Use <strong>Unhide</strong> to restore one.
+            These applications were hidden from long listing. Use <strong>Unhide</strong> for one, or{' '}
+            <strong>Unhide all</strong> to restore every row.
           </p>
         </div>
-        <button
-          type="button"
-          disabled={exporting || total === 0}
-          onClick={() => void exportCsv()}
-          className="rounded-xl bg-nck-green px-4 py-2.5 text-sm font-semibold text-white hover:bg-nck-greenDark disabled:opacity-60"
-        >
-          {exporting ? 'Exporting…' : 'Export CSV'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={unhideAllMutation.isPending || total === 0}
+            onClick={() => {
+              if (
+                !window.confirm(
+                  `Unhide all ${total.toLocaleString()} hidden duplicate${total === 1 ? '' : 's'} back to long listing?`,
+                )
+              ) {
+                return;
+              }
+              unhideAllMutation.mutate();
+            }}
+            className="rounded-xl border border-nck-green/20 bg-nck-greenLight px-4 py-2.5 text-sm font-semibold text-nck-green hover:bg-nck-green/10 disabled:opacity-60"
+          >
+            {unhideAllMutation.isPending ? 'Unhiding…' : `Unhide all (${total})`}
+          </button>
+          <button
+            type="button"
+            disabled={exporting || total === 0}
+            onClick={() => void exportCsv()}
+            className="rounded-xl bg-nck-green px-4 py-2.5 text-sm font-semibold text-white hover:bg-nck-greenDark disabled:opacity-60"
+          >
+            {exporting ? 'Exporting…' : 'Export Excel'}
+          </button>
+        </div>
       </div>
 
       {(exportError || actionError) && (

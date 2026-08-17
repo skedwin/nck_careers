@@ -5,12 +5,12 @@ export default {
     extend: {
       colors: {
         nck: {
-          green: '#0B5C3B',
-          greenDark: '#08462D',
-          greenLight: '#E7F3EE',
-          gold: '#C4A35A',
+          green: '#4B1E6D',
+          greenDark: '#351456',
+          greenLight: '#F3EAF8',
+          gold: '#C9A227',
           slate: '#1F2937',
-          mist: '#F3F6F5',
+          mist: '#F7F2FA',
         },
       },
       fontFamily: {

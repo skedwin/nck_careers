@@ -23,15 +23,34 @@ class AuthController extends Controller
     {
     }
 
-    public function redirectToMicrosoft(): RedirectResponse|JsonResponse
+    public function redirectToMicrosoft(Request $request): RedirectResponse|JsonResponse
     {
         if (! $this->microsoftConfigured()) {
             return ApiResponse::error('Microsoft Entra ID is not configured.', 503);
         }
 
-        return Socialite::driver('microsoft')
+        $this->bindMicrosoftRedirect();
+        $origin = $this->safeFrontendOrigin($request->query('frontend'));
+
+        $redirect = Socialite::driver('microsoft')
             ->stateless()
             ->redirect();
+
+        if ($origin) {
+            $redirect->headers->setCookie(cookie(
+                'nck_oauth_frontend',
+                $origin,
+                10,
+                '/',
+                null,
+                false,
+                true,
+                false,
+                'lax',
+            ));
+        }
+
+        return $redirect;
     }
 
     public function handleMicrosoftCallback(Request $request): RedirectResponse|JsonResponse
@@ -40,18 +59,20 @@ class AuthController extends Controller
             return ApiResponse::error('Microsoft Entra ID is not configured.', 503);
         }
 
+        $this->bindMicrosoftRedirect();
+
         try {
             $microsoftUser = Socialite::driver('microsoft')->stateless()->user();
         } catch (Throwable $e) {
             report($e);
 
-            return redirect()->away($this->frontendUrl('/login?error=microsoft_auth_failed'));
+            return redirect()->away($this->frontendUrl('/login?error=microsoft_auth_failed', $request));
         }
 
         $email = strtolower((string) $microsoftUser->getEmail());
 
         if ($email === '' || ! Str::endsWith($email, ['@nckenya.go.ke'])) {
-            return redirect()->away($this->frontendUrl('/login?error=unauthorized_domain'));
+            return redirect()->away($this->frontendUrl('/login?error=unauthorized_domain', $request));
         }
 
         $user = User::query()->updateOrCreate(
@@ -67,7 +88,7 @@ class AuthController extends Controller
         );
 
         if (! $user->is_active) {
-            return redirect()->away($this->frontendUrl('/login?error=account_inactive'));
+            return redirect()->away($this->frontendUrl('/login?error=account_inactive', $request));
         }
 
         if (! $user->hasAnyRole([
@@ -95,7 +116,7 @@ class AuthController extends Controller
 
         $this->auditLogger->log('auth.microsoft_login', $user, null, ['email' => $user->email], $request);
 
-        return redirect()->away($this->frontendUrl('/auth/callback?token='.urlencode($token)));
+        return redirect()->away($this->frontendUrl('/auth/callback?token='.urlencode($token), $request));
     }
 
     public function devLogin(Request $request): JsonResponse
@@ -159,8 +180,36 @@ class AuthController extends Controller
             && filled(config('services.microsoft.tenant'));
     }
 
-    private function frontendUrl(string $path): string
+    private function bindMicrosoftRedirect(): void
     {
-        return rtrim((string) config('nck.frontend_url'), '/').$path;
+        config([
+            'services.microsoft.redirect' => env(
+                'MICROSOFT_REDIRECT_URI',
+                'http://localhost:8000/api/v1/auth/microsoft/callback',
+            ),
+        ]);
+    }
+
+    private function safeFrontendOrigin(mixed $candidate): ?string
+    {
+        $origin = rtrim((string) $candidate, '/');
+        if ($origin === '') {
+            return null;
+        }
+
+        $allowed = config('nck.frontend_urls', []);
+        if (! is_array($allowed) || ! in_array($origin, $allowed, true)) {
+            return null;
+        }
+
+        return $origin;
+    }
+
+    private function frontendUrl(string $path, Request $request): string
+    {
+        $fromCookie = $this->safeFrontendOrigin($request->cookie('nck_oauth_frontend'));
+        $base = $fromCookie ?? rtrim((string) config('nck.frontend_url'), '/');
+
+        return $base.$path;
     }
 }

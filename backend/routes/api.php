@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\MailAttachmentController;
 use App\Http\Controllers\Api\V1\MailboxController;
+use App\Http\Controllers\Api\V1\MyJobsController;
 use App\Http\Controllers\Api\V1\PositionController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\ScreeningController;
@@ -67,6 +68,8 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('permission:applications.view');
         Route::post('/applications/convert-from-mailbox', [ApplicationController::class, 'convertFromMailbox'])
             ->middleware(['permission:applications.create|applications.update', 'throttle:10,1']);
+        Route::post('/applications/unhide-all-duplicates', [ApplicationController::class, 'unhideAllDuplicates'])
+            ->middleware('permission:applications.update');
         Route::get('/applications/{application}', [ApplicationController::class, 'show'])
             ->middleware('permission:applications.view');
         Route::put('/applications/{application}/profile', [ApplicationController::class, 'updateProfile'])
@@ -116,6 +119,11 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/shortlisting/{application}', [ShortlistController::class, 'shortlist'])
             ->middleware('permission:applications.shortlist');
 
+        Route::get('/myjobs', [MyJobsController::class, 'index'])
+            ->middleware('permission:applications.view|reports.view');
+        Route::get('/myjobs/export', [MyJobsController::class, 'export'])
+            ->middleware('permission:applications.view|reports.view');
+
         Route::get('/reports/summary', [ReportController::class, 'summary'])
             ->middleware('permission:reports.view');
         Route::get('/reports/long-listing', [ReportController::class, 'longListing'])
@@ -124,6 +132,10 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('permission:reports.view');
         Route::get('/reports/long-listing/{category}', [ReportController::class, 'longListingCategory'])
             ->where('category', 'unassigned|[0-9]+')
+            ->middleware('permission:reports.view');
+        Route::get('/reports/email-duplicates', [ReportController::class, 'emailDuplicates'])
+            ->middleware('permission:reports.view');
+        Route::get('/reports/email-duplicates/export', [ReportController::class, 'emailDuplicatesExport'])
             ->middleware('permission:reports.view');
         Route::get('/reports/hidden-duplicates', [ReportController::class, 'hiddenDuplicates'])
             ->middleware('permission:reports.view');

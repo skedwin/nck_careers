@@ -8,6 +8,7 @@ use App\Models\MailAttachment;
 use App\Models\MailMessage;
 use App\Services\Reports\LongListingReportService;
 use App\Support\ApiResponse;
+use App\Support\Excel\NckReportExcel;
 use App\Support\NairobiDate;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -68,6 +69,7 @@ class ReportController extends Controller
         return ApiResponse::success([
             'counts_by_status' => $byStatus,
             'counts_by_position' => $byPosition,
+            'email_duplicates' => $this->longListing->emailDuplicatesSummary(),
             'mailbox' => [
                 'messages_total' => MailMessage::query()->count(),
                 'messages_pending_application' => MailMessage::query()->where('application_created', false)->count(),
@@ -157,29 +159,100 @@ class ReportController extends Controller
         }
 
         $stamp = now()->timezone(NairobiDate::TZ)->format('Ymd_His');
-        $filename = 'nck_long_listing_'.preg_replace('/[^A-Za-z0-9_\-]+/', '_', $suffix)."_{$stamp}.csv";
+        $filename = 'nck_long_listing_'.preg_replace('/[^A-Za-z0-9_\-]+/', '_', $suffix)."_{$stamp}.xls";
+        $subtitle = count($rows).' applicant row(s)';
+        if (! empty($validated['q'])) {
+            $subtitle .= ' · search “'.$validated['q'].'”';
+        }
+        if (! empty($validated['qualification'])) {
+            $subtitle .= ' · '.$validated['qualification'];
+        }
+        if (! empty($validated['duplicates'])) {
+            $subtitle .= ' · '.$validated['duplicates'];
+        }
 
-        return response()->streamDownload(function () use ($headers, $rows): void {
-            $out = fopen('php://output', 'w');
-            if ($out === false) {
-                return;
-            }
+        $commentKey = 'Comments/Remarks-- for PWD must indicated or attach in the certificates';
 
-            fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, $headers);
+        return (new NckReportExcel('Long listing', $subtitle))
+            ->addSheet('Long listing', $headers, $rows, [
+                'highlight' => function (array $row) use ($commentKey): ?string {
+                    $comments = strtolower((string) ($row[$commentKey] ?? ''));
+                    if (str_contains($comments, 'duplicate')) {
+                        return 'duplicate';
+                    }
 
-            foreach ($rows as $row) {
-                $line = [];
-                foreach ($headers as $header) {
-                    $line[] = $row[$header] ?? '';
-                }
-                fputcsv($out, $line);
-            }
+                    return null;
+                },
+            ])
+            ->download($filename);
+    }
 
-            fclose($out);
-        }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+    public function emailDuplicates(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'position_id' => ['nullable', 'integer', 'exists:positions,id'],
         ]);
+
+        $report = $this->longListing->emailDuplicatesReport(
+            isset($validated['position_id']) ? (int) $validated['position_id'] : null,
+        );
+
+        return ApiResponse::success($report);
+    }
+
+    public function emailDuplicatesExport(Request $request): StreamedResponse
+    {
+        $validated = $request->validate([
+            'position_id' => ['nullable', 'integer', 'exists:positions,id'],
+        ]);
+
+        $report = $this->longListing->emailDuplicatesReport(
+            isset($validated['position_id']) ? (int) $validated['position_id'] : null,
+        );
+
+        $headers = [
+            'SN.',
+            'Unique Identifier',
+            'Duplicate of Unique Identifier',
+            'Category Code',
+            'Category / Position',
+            'Applicant Name',
+            'Email',
+            'Telephone/Mobile No',
+            'ID No',
+            'Same-email group size',
+            'Status',
+            'Received At',
+        ];
+
+        $stamp = now()->timezone(NairobiDate::TZ)->format('Ymd_His');
+        $filename = "nck_email_duplicates_{$stamp}.xls";
+        $excelRows = [];
+        foreach ($report['rows'] as $row) {
+            $excelRows[] = [
+                $row['serial_no'],
+                $row['application_reference'],
+                $row['duplicate_of_reference'],
+                $row['position_code'],
+                $row['position_title'],
+                $row['applicant_name'],
+                $row['email'],
+                $row['phone'],
+                $row['national_id'],
+                $row['group_size'],
+                $row['status'],
+                $row['received_at'],
+            ];
+        }
+
+        return (new NckReportExcel(
+            'Duplicates — same email',
+            ($report['total'] ?? count($excelRows)).' duplicate application(s) · '.($report['groups'] ?? 0).' shared email(s)',
+        ))
+            ->addSheet('Same email duplicates', $headers, $excelRows, [
+                'highlight' => fn (): string => 'duplicate',
+            ])
+            ->download($filename);
     }
 
     public function hiddenDuplicates(Request $request): JsonResponse
@@ -222,38 +295,33 @@ class ReportController extends Controller
         ];
 
         $stamp = now()->timezone(NairobiDate::TZ)->format('Ymd_His');
-        $filename = "nck_hidden_duplicates_{$stamp}.csv";
+        $filename = "nck_hidden_duplicates_{$stamp}.xls";
+        $excelRows = [];
+        foreach ($report['rows'] as $row) {
+            $excelRows[] = [
+                $row['serial_no'],
+                $row['application_reference'],
+                $row['duplicate_of_reference'],
+                $row['position_code'],
+                $row['position_title'],
+                $row['applicant_name'],
+                $row['email'],
+                $row['phone'],
+                $row['national_id'],
+                $row['hidden_at'],
+                $row['hidden_by'],
+                $row['status'],
+                $row['received_at'],
+            ];
+        }
 
-        return response()->streamDownload(function () use ($headers, $report): void {
-            $out = fopen('php://output', 'w');
-            if ($out === false) {
-                return;
-            }
-
-            fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, $headers);
-
-            foreach ($report['rows'] as $row) {
-                fputcsv($out, [
-                    $row['serial_no'],
-                    $row['application_reference'],
-                    $row['duplicate_of_reference'],
-                    $row['position_code'],
-                    $row['position_title'],
-                    $row['applicant_name'],
-                    $row['email'],
-                    $row['phone'],
-                    $row['national_id'],
-                    $row['hidden_at'],
-                    $row['hidden_by'],
-                    $row['status'],
-                    $row['received_at'],
-                ]);
-            }
-
-            fclose($out);
-        }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-        ]);
+        return (new NckReportExcel(
+            'Hidden duplicates',
+            ($report['total'] ?? count($excelRows)).' hidden duplicate(s)',
+        ))
+            ->addSheet('Hidden duplicates', $headers, $excelRows, [
+                'highlight' => fn (): string => 'duplicate',
+            ])
+            ->download($filename);
     }
 }

@@ -24,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
 
+        $middleware->encryptCookies(except: [
+            'nck_oauth_frontend',
+        ]);
+
         // React uses Bearer tokens (Sanctum personal access tokens), not cookie SPA sessions.
         // Stateful Sanctum was forcing CSRF checks from localhost:5173 and breaking POST /mailbox/sync*.
         $middleware->validateCsrfTokens(except: [

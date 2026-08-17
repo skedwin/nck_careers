@@ -11,7 +11,9 @@ import DashboardPage from './pages/DashboardPage';
 import DocumentsPage from './pages/DocumentsPage';
 import LoginPage from './pages/LoginPage';
 import MailboxPage from './pages/MailboxPage';
+import MyJobsPage from './pages/MyJobsPage';
 import PositionsPage from './pages/PositionsPage';
+import EmailDuplicatesPage from './pages/EmailDuplicatesPage';
 import HiddenDuplicatesPage from './pages/HiddenDuplicatesPage';
 import LongListingCategoryPage from './pages/LongListingCategoryPage';
 import ReportsPage from './pages/ReportsPage';
@@ -42,8 +44,10 @@ export default function App() {
               <Route path="/shortlisting" element={<ShortlistingPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/mailbox" element={<MailboxPage />} />
+              <Route path="/myjobs" element={<MyJobsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/reports/long-listing/:categoryKey" element={<LongListingCategoryPage />} />
+              <Route path="/reports/email-duplicates" element={<EmailDuplicatesPage />} />
               <Route path="/reports/hidden-duplicates" element={<HiddenDuplicatesPage />} />
               <Route path="/users" element={<UsersPage />} />
               <Route path="/settings" element={<SettingsPage />} />

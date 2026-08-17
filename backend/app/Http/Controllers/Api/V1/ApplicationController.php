@@ -372,6 +372,33 @@ class ApplicationController extends Controller
         return ApiResponse::success($this->serializeDetail($application), 'Duplicate restored to long listing.');
     }
 
+    public function unhideAllDuplicates(Request $request): JsonResponse
+    {
+        $count = Application::query()->whereNotNull('duplicate_hidden_at')->count();
+
+        Application::query()
+            ->whereNotNull('duplicate_hidden_at')
+            ->update([
+                'duplicate_hidden_at' => null,
+                'duplicate_hidden_by' => null,
+                'duplicate_of_application_id' => null,
+                'duplicate_of_reference' => null,
+            ]);
+
+        $this->auditLogger->log('application.duplicates_unhidden_all', null, null, [
+            'unhidden_count' => $count,
+        ], $request);
+
+        return ApiResponse::success(
+            ['unhidden' => $count],
+            $count === 0
+                ? 'No hidden duplicates to restore.'
+                : ($count === 1
+                    ? '1 duplicate restored to long listing.'
+                    : "{$count} duplicates restored to long listing.")
+        );
+    }
+
     public function convertFromMailbox(Request $request): JsonResponse
     {
         $validated = $request->validate([

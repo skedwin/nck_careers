@@ -10,6 +10,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.29",
         "laravel/tinker": "^2.9",
+        "phpoffice/phpspreadsheet": "^5.9",
         "smalot/pdfparser": "^2.12",
         "socialiteproviders/microsoft": "^4.10",
         "spatie/laravel-permission": "^6.25"

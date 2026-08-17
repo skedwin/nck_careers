@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { resolveMicrosoftAuthBaseUrl } from '../lib/api';
 
 export default function LoginPage() {
   const { user, loading, devLogin } = useAuth();
@@ -29,7 +30,7 @@ export default function LoginPage() {
     }
   };
 
-  const microsoftLoginUrl = `${import.meta.env.VITE_API_BASE_URL}/auth/microsoft/redirect`;
+  const microsoftLoginUrl = `${resolveMicrosoftAuthBaseUrl()}/auth/microsoft/redirect?frontend=${encodeURIComponent(window.location.origin)}`;
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">

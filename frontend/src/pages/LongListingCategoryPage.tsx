@@ -105,10 +105,10 @@ export default function LongListingCategoryPage() {
         (key === 'unassigned' ? 'unassigned' : key);
       await downloadAuthorized(
         `/reports/long-listing/export?${params.toString()}`,
-        `nck_long_listing_${code}_${Date.now()}.csv`,
+        `nck_long_listing_${code}_${Date.now()}.xls`,
       );
     } catch (error) {
-      setExportError(getApiError(error, 'CSV export failed.'));
+      setExportError(getApiError(error, 'Excel export failed.'));
     } finally {
       setExporting(false);
     }
@@ -168,7 +168,7 @@ export default function LongListingCategoryPage() {
           onClick={() => void exportCsv()}
           className="rounded-xl bg-nck-green px-4 py-2.5 text-sm font-semibold text-white hover:bg-nck-greenDark disabled:opacity-60"
         >
-          {exporting ? 'Exporting…' : 'Export CSV'}
+          {exporting ? 'Exporting…' : 'Export Excel'}
         </button>
       </div>
 

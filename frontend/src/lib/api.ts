@@ -1,7 +1,33 @@
 import axios from 'axios';
 
+/** API host follows the page: same hostname, port 8000 (localhost or LAN IP). */
+export function resolveApiBaseUrl(): string {
+  const fallback =
+    (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://127.0.0.1:8000/api/v1';
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
+  const { hostname, protocol } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return `${protocol}//${hostname}:8000/api/v1`;
+  }
+
+  return `${protocol}//${hostname}:8000/api/v1`;
+}
+
+/** Microsoft SSO always starts on localhost (Entra callback is registered there). */
+export function resolveMicrosoftAuthBaseUrl(): string {
+  const fromEnv = import.meta.env.VITE_MICROSOFT_AUTH_BASE_URL as string | undefined;
+  if (fromEnv) {
+    return fromEnv.replace(/\/$/, '');
+  }
+
+  return 'http://localhost:8000/api/v1';
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api/v1',
+  baseURL: resolveApiBaseUrl(),
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -307,6 +333,41 @@ export type AuditLog = {
   user?: { id: number; name?: string; display_name?: string; email?: string } | null;
 };
 
+export type EmailDuplicateCategory = {
+  key: string;
+  position_id: number | null;
+  reference_code?: string | null;
+  title: string;
+  groups: number;
+  duplicate_applicants: number;
+};
+
+export type EmailDuplicateRow = {
+  serial_no: number;
+  application_id: number;
+  application_reference: string;
+  position_key?: string;
+  position_code?: string | null;
+  position_title?: string | null;
+  applicant_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  national_id?: string | null;
+  duplicate_of_reference?: string | null;
+  duplicate_of_application_id?: number | null;
+  group_size?: number | null;
+  received_at?: string | null;
+  status?: string;
+};
+
+export type EmailDuplicatesReport = {
+  generated_at?: string | null;
+  total: number;
+  groups: number;
+  categories: EmailDuplicateCategory[];
+  rows: EmailDuplicateRow[];
+};
+
 export type ReportSummary = {
   counts_by_status?: Record<string, number>;
   counts_by_position?: Array<{
@@ -316,6 +377,11 @@ export type ReportSummary = {
     vacancies?: number | null;
     total: number;
   }>;
+  email_duplicates?: {
+    total: number;
+    groups: number;
+    categories: EmailDuplicateCategory[];
+  };
   applications_this_week?: number;
   applications_this_month?: number;
   generated_at?: string | null;
@@ -426,6 +492,71 @@ export type LongListingCategory = LongListingCategorySummary & {
 };
 
 export type LongListingReport = LongListingIndex;
+
+export type MyJobsMatch = {
+  applicant_id: number;
+  applicant_name?: string | null;
+  applicant_email?: string | null;
+  matched_on?: string;
+  applications?: Array<{
+    application_id: number;
+    application_reference: string;
+    position_code?: string | null;
+    position_title?: string | null;
+  }>;
+};
+
+export type MyJobsRow = {
+  serial_no: number;
+  file: string;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  gender?: string | null;
+  education?: string | null;
+  position?: string | null;
+  applied_at?: string | null;
+  mapped_position_id?: number | null;
+  mapped_position_code?: string | null;
+  mapped_position_title?: string | null;
+  in_system: boolean;
+  exists_by_email: boolean;
+  exists_by_name: boolean;
+  match: string;
+  matches: MyJobsMatch[];
+};
+
+export type MyJobsListing = {
+  generated_at?: string | null;
+  files: Array<{
+    file: string;
+    position_title?: string | null;
+    position_code?: string | null;
+    listed: number;
+    in_system: number;
+    missing: number;
+  }>;
+  totals: {
+    listed: number;
+    in_system: number;
+    missing: number;
+    by_email: number;
+    by_name: number;
+    by_name_only: number;
+  };
+  rows: MyJobsRow[];
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from?: number | null;
+    to?: number | null;
+    file?: string | null;
+    existence?: string | null;
+    search?: string | null;
+  };
+};
 
 export function getApiError(error: unknown, fallback = 'Request failed.'): string {
   if (error instanceof Error && !('response' in error) && error.message) {

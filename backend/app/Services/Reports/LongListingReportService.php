@@ -8,6 +8,7 @@ use App\Support\NairobiDate;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class LongListingReportService
 {
@@ -603,6 +604,209 @@ class LongListingReportService
         return [
             'generated_at' => NairobiDate::iso(now()),
             'total' => count($rows),
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * Counts of same-email duplicates per position (no applicant rows).
+     *
+     * @return array{total: int, groups: int, categories: list<array<string, mixed>>}
+     */
+    public function emailDuplicatesSummary(): array
+    {
+        $grouped = Application::query()
+            ->join('applicants', 'applicants.id', '=', 'applications.applicant_id')
+            ->leftJoin('positions', 'positions.id', '=', 'applications.position_id')
+            ->whereNull('applications.duplicate_hidden_at')
+            ->whereNotNull('applicants.email')
+            ->where('applicants.email', '!=', '')
+            ->select([
+                'applications.position_id',
+                'positions.reference_code',
+                'positions.title',
+                'positions.sort_order',
+                DB::raw('LOWER(TRIM(applicants.email)) as email_key'),
+                DB::raw('COUNT(*) as total'),
+            ])
+            ->groupBy(
+                'applications.position_id',
+                'positions.reference_code',
+                'positions.title',
+                'positions.sort_order',
+                DB::raw('LOWER(TRIM(applicants.email))')
+            )
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        /** @var array<string, array<string, mixed>> $categoryMap */
+        $categoryMap = [];
+        $total = 0;
+        $groups = 0;
+
+        foreach ($grouped as $row) {
+            $email = strtolower(trim((string) $row->email_key));
+            if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            $groups++;
+            $extras = max(0, (int) $row->total - 1);
+            $total += $extras;
+            $key = $row->position_id === null ? 'unassigned' : (string) $row->position_id;
+            if (! isset($categoryMap[$key])) {
+                $categoryMap[$key] = [
+                    'key' => $key,
+                    'position_id' => $row->position_id !== null ? (int) $row->position_id : null,
+                    'reference_code' => $row->reference_code,
+                    'title' => $row->title ?? 'Unassigned / category not identified',
+                    'sort_order' => (int) ($row->sort_order ?? 9999),
+                    'groups' => 0,
+                    'duplicate_applicants' => 0,
+                ];
+            }
+            $categoryMap[$key]['groups']++;
+            $categoryMap[$key]['duplicate_applicants'] += $extras;
+        }
+
+        $categories = collect($categoryMap)
+            ->sortBy([
+                ['sort_order', 'asc'],
+                ['key', 'asc'],
+            ])
+            ->values()
+            ->map(function (array $category) {
+                unset($category['sort_order']);
+
+                return $category;
+            })
+            ->all();
+
+        return [
+            'total' => $total,
+            'groups' => $groups,
+            'categories' => $categories,
+        ];
+    }
+
+    /**
+     * Duplicates defined only by the same email address within a position.
+     * Earliest application is the Unique Identifier; later ones are duplicates.
+     *
+     * @return array{
+     *   generated_at: string|null,
+     *   total: int,
+     *   groups: int,
+     *   categories: list<array<string, mixed>>,
+     *   rows: list<array<string, mixed>>
+     * }
+     */
+    public function emailDuplicatesReport(?int $positionId = null): array
+    {
+        $query = Application::query()
+            ->with([
+                'applicant:id,full_name,email,phone,national_id',
+                'position:id,reference_code,title,sort_order',
+            ])
+            ->whereNull('duplicate_hidden_at')
+            ->whereHas('applicant', function (Builder $applicant): void {
+                $applicant->whereNotNull('email')->where('email', '!=', '');
+            })
+            ->orderBy('received_at')
+            ->orderBy('id');
+
+        if ($positionId !== null) {
+            $query->where('position_id', $positionId);
+        }
+
+        /** @var array<string, list<Application>> $buckets */
+        $buckets = [];
+        foreach ($query->get() as $app) {
+            $email = strtolower(trim((string) ($app->applicant?->email ?? '')));
+            if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            $posKey = $app->position_id === null ? 'unassigned' : (string) $app->position_id;
+            $buckets[$posKey.'|'.$email][] = $app;
+        }
+
+        /** @var array<string, array<string, mixed>> $categoryMap */
+        $categoryMap = [];
+        $rows = [];
+        $groups = 0;
+
+        foreach ($buckets as $members) {
+            if (count($members) < 2) {
+                continue;
+            }
+
+            $groups++;
+            $primary = $members[0];
+            $key = $primary->position_id === null ? 'unassigned' : (string) $primary->position_id;
+            if (! isset($categoryMap[$key])) {
+                $categoryMap[$key] = [
+                    'key' => $key,
+                    'position_id' => $primary->position_id,
+                    'reference_code' => $primary->position?->reference_code,
+                    'title' => $primary->position?->title ?? 'Unassigned / category not identified',
+                    'sort_order' => (int) ($primary->position?->sort_order ?? 9999),
+                    'groups' => 0,
+                    'duplicate_applicants' => 0,
+                ];
+            }
+
+            $extras = count($members) - 1;
+            $categoryMap[$key]['groups']++;
+            $categoryMap[$key]['duplicate_applicants'] += $extras;
+
+            $primaryId = (int) $primary->id;
+            $primaryReference = (string) $primary->application_reference;
+            $groupSize = count($members);
+
+            foreach (array_slice($members, 1) as $dup) {
+                $rows[] = [
+                    'serial_no' => 0,
+                    'application_id' => $dup->id,
+                    'application_reference' => $dup->application_reference,
+                    'position_key' => $key,
+                    'position_code' => $dup->position?->reference_code,
+                    'position_title' => $dup->position?->title ?? 'Unassigned / category not identified',
+                    'applicant_name' => $dup->applicant?->full_name,
+                    'email' => $dup->applicant?->email,
+                    'phone' => $dup->applicant?->phone,
+                    'national_id' => $dup->applicant?->national_id,
+                    'duplicate_of_reference' => $primaryReference,
+                    'duplicate_of_application_id' => $primaryId,
+                    'group_size' => $groupSize,
+                    'received_at' => NairobiDate::iso($dup->received_at),
+                    'status' => $dup->status,
+                ];
+            }
+        }
+
+        $categories = collect($categoryMap)
+            ->sortBy([
+                ['sort_order', 'asc'],
+                ['key', 'asc'],
+            ])
+            ->values()
+            ->map(function (array $category) {
+                unset($category['sort_order']);
+
+                return $category;
+            })
+            ->all();
+
+        foreach ($rows as $index => $row) {
+            $rows[$index]['serial_no'] = $index + 1;
+        }
+
+        return [
+            'generated_at' => NairobiDate::iso(now()),
+            'total' => count($rows),
+            'groups' => $groups,
+            'categories' => $categories,
             'rows' => $rows,
         ];
     }

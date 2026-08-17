@@ -58,10 +58,10 @@ export default function ReportsPage() {
     try {
       await downloadAuthorized(
         '/reports/long-listing/export?include_unassigned=1',
-        `nck_long_listing_all_${Date.now()}.csv`,
+        `nck_long_listing_all_${Date.now()}.xls`,
       );
     } catch (error) {
-      setExportError(getApiError(error, 'CSV export failed.'));
+      setExportError(getApiError(error, 'Excel export failed.'));
     } finally {
       setExporting(false);
     }
@@ -98,7 +98,7 @@ export default function ReportsPage() {
           onClick={() => void exportAll()}
           className="rounded-xl bg-nck-green px-4 py-2.5 text-sm font-semibold text-white hover:bg-nck-greenDark disabled:opacity-60"
         >
-          {exporting ? 'Exporting…' : 'Export all CSV'}
+          {exporting ? 'Exporting…' : 'Export Excel'}
         </button>
       </div>
 
@@ -116,17 +116,70 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">By status</h3>
-          <ul className="mt-3 space-y-2 text-sm">
-            {statusEntries.length === 0 && <li className="text-slate-500">No applications yet.</li>}
-            {statusEntries.map(([status, total]) => (
-              <li key={status} className="flex justify-between rounded-xl bg-nck-mist px-3 py-2">
-                <span className="capitalize text-nck-slate">{humanize(status)}</span>
-                <span className="font-semibold text-nck-green">{total}</span>
-              </li>
-            ))}
-          </ul>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">By status</h3>
+            <ul className="mt-3 space-y-2 text-sm">
+              {statusEntries.length === 0 && <li className="text-slate-500">No applications yet.</li>}
+              {statusEntries.map(([status, total]) => (
+                <li key={status} className="flex justify-between rounded-xl bg-nck-mist px-3 py-2">
+                  <span className="capitalize text-nck-slate">{humanize(status)}</span>
+                  <span className="font-semibold text-nck-green">{total}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Duplicates
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">Same email address, within each position.</p>
+              </div>
+              <Link
+                to="/reports/email-duplicates"
+                className="shrink-0 text-sm font-semibold text-nck-green hover:underline"
+              >
+                Open report
+              </Link>
+            </div>
+            <p className="mt-3 font-display text-3xl font-semibold text-nck-green">
+              {(data.email_duplicates?.total ?? 0).toLocaleString()}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {(data.email_duplicates?.groups ?? 0).toLocaleString()} email
+              {(data.email_duplicates?.groups ?? 0) === 1 ? '' : 's'} with more than one application
+            </p>
+            <ul className="mt-3 space-y-2 text-sm">
+              {(data.email_duplicates?.categories ?? []).length === 0 && (
+                <li className="text-slate-500">No same-email duplicates.</li>
+              )}
+              {(data.email_duplicates?.categories ?? []).map((row) => (
+                <li
+                  key={row.key}
+                  className="flex justify-between gap-3 rounded-xl bg-nck-mist px-3 py-2"
+                >
+                  <span className="text-nck-slate">
+                    {row.reference_code ? `${row.reference_code} · ` : ''}
+                    {row.title}
+                  </span>
+                  <Link
+                    to={
+                      row.position_id != null
+                        ? `/reports/email-duplicates?position_id=${row.position_id}`
+                        : '/reports/email-duplicates'
+                    }
+                    className="shrink-0 font-semibold text-amber-800 hover:underline"
+                    title="Open same-email duplicates for this category"
+                  >
+                    {row.duplicate_applicants.toLocaleString()}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">
