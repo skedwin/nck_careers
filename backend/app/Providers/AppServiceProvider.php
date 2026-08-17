@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Services\AI\AIServiceInterface;
-use App\Services\AI\MockAIService;
+use App\Services\AI\AiServiceFactory;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use SocialiteProviders\Manager\SocialiteWasCalled;
@@ -13,7 +13,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(AIServiceInterface::class, MockAIService::class);
+        $this->app->bind(AIServiceInterface::class, function ($app) {
+            return $app->make(AiServiceFactory::class)->make();
+        });
     }
 
     public function boot(): void

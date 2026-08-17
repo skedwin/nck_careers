@@ -22,7 +22,7 @@ class ScreeningController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Application::query()
-            ->with(['applicant:id,uuid,full_name,email', 'position:id,uuid,title,reference_code', 'screeningResults'])
+            ->with(['applicant:id,uuid,full_name,email', 'position:id,uuid,title,reference_code', 'screeningResults', 'latestAiExtraction'])
             ->whereIn('screening_status', ['pending', 'in_progress', 'needs_review'])
             ->latest('received_at');
 
@@ -56,6 +56,7 @@ class ScreeningController extends Controller
                 'result' => $r->result,
                 'evidence' => $r->evidence,
             ])->values(),
+            'ai_extraction_status' => $application->latestAiExtraction?->status,
         ]);
 
         return ApiResponse::success($paginator);
@@ -132,12 +133,18 @@ class ScreeningController extends Controller
             ], 'Marked for review — no criteria.');
         }
 
+        $application->loadMissing('latestAiExtraction');
+        $aiKeywords = data_get($application->latestAiExtraction?->payload, 'keywords', []);
+        $aiSummary = data_get($application->latestAiExtraction?->payload, 'summary');
+
         $haystack = mb_strtolower(implode(' ', array_filter([
             $application->subject,
             $application->mailMessage?->subject,
             $application->mailMessage?->body_text,
             $application->applicant?->full_name,
             $application->applicant?->registration_number,
+            is_array($aiKeywords) ? implode(' ', $aiKeywords) : null,
+            is_string($aiSummary) ? $aiSummary : null,
         ])));
 
         $keywordMap = [

@@ -6,6 +6,7 @@ import api, {
   type ApiSuccess,
   type Application,
   type ApplicationProfile,
+  type AiExtraction,
 } from '../lib/api';
 import { formatEAT, humanize } from '../lib/dates';
 import { downloadAuthorized } from '../lib/download';
@@ -143,6 +144,8 @@ export default function ApplicationDetailPage() {
   const canUpdate = user?.permissions?.includes('applications.update') ?? false;
   const canEditProfile =
     canUpdate || (user?.permissions?.includes('applications.profile.update') ?? false);
+  const canReviewAi =
+    canEditProfile || (user?.permissions?.includes('screening.update') ?? false);
   const queryClient = useQueryClient();
   const [note, setNote] = useState('');
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -261,6 +264,34 @@ export default function ApplicationDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ['reports-long-listing'] });
       void queryClient.invalidateQueries({ queryKey: ['reports-long-listing-category'] });
       void queryClient.invalidateQueries({ queryKey: ['reports-hidden-duplicates'] });
+    },
+  });
+
+  const aiProcessMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post<ApiSuccess<{ ai_extraction: AiExtraction | null }>>(
+        `/applications/${id}/ai/process`,
+        { force: true },
+      );
+      return response.data.data.ai_extraction;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['application', id] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
+  const aiReviewMutation = useMutation({
+    mutationFn: async (action: 'accept' | 'reject') => {
+      const response = await api.post<ApiSuccess<{ ai_extraction: AiExtraction | null }>>(
+        `/applications/${id}/ai/review`,
+        { action },
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['application', id] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
@@ -1139,6 +1170,105 @@ export default function ApplicationDetailPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">System assessment</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Assistive extraction only. It never changes eligibility, screening, or shortlisting.
+            </p>
+          </div>
+          {canReviewAi && (
+            <button
+              type="button"
+              disabled={aiProcessMutation.isPending}
+              onClick={() => aiProcessMutation.mutate()}
+              className="rounded-xl border border-nck-green/20 px-3 py-2 text-sm font-semibold text-nck-green disabled:opacity-60"
+            >
+              {aiProcessMutation.isPending ? 'Running…' : app.ai_extraction ? 'Re-run assessment' : 'Run assessment'}
+            </button>
+          )}
+        </div>
+
+        {(aiProcessMutation.isError || aiReviewMutation.isError) && (
+          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+            {getApiError(aiProcessMutation.error || aiReviewMutation.error, 'Unable to update system assessment.')}
+          </p>
+        )}
+
+        {!app.ai_extraction && (
+          <p className="mt-4 text-sm text-slate-500">No system assessment yet.</p>
+        )}
+
+        {app.ai_extraction && (
+          <div className="mt-4 space-y-3 text-sm">
+            <p className="text-slate-600">
+              Status: <span className="font-semibold text-nck-slate">{humanize(app.ai_extraction.status)}</span>
+              {app.ai_extraction.provider ? ` · ${app.ai_extraction.provider}` : ''}
+              {app.ai_extraction.confidence != null
+                ? ` · confidence ${Math.round(app.ai_extraction.confidence * 100)}%`
+                : ''}
+              {app.ai_extraction.low_confidence ? ' · low confidence — review required' : ''}
+            </p>
+            {app.ai_extraction.error && <p className="text-red-700">{app.ai_extraction.error}</p>}
+            {app.ai_extraction.summary && <p className="text-slate-600">{app.ai_extraction.summary}</p>}
+            {app.ai_extraction.position_hint && (
+              <p className="text-slate-600">Position hint: {app.ai_extraction.position_hint}</p>
+            )}
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left">
+                <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-2 py-2">Field</th>
+                    <th className="px-2 py-2">On file</th>
+                    <th className="px-2 py-2">Suggested</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(
+                    [
+                      ['Name', app.ai_extraction.current?.full_name ?? app.applicant?.full_name, app.ai_extraction.applicant?.full_name],
+                      ['Email', app.ai_extraction.current?.email ?? app.applicant?.email, app.ai_extraction.applicant?.email],
+                      ['Phone', app.ai_extraction.current?.phone ?? app.applicant?.phone, app.ai_extraction.applicant?.phone],
+                      ['Registration', app.ai_extraction.current?.registration_number ?? app.applicant?.registration_number, app.ai_extraction.applicant?.registration_number],
+                    ] as Array<[string, string | null | undefined, string | null | undefined]>
+                  ).map(([label, current, suggested]) => (
+                    <tr key={label} className="border-b border-slate-100">
+                      <td className="px-2 py-2 font-medium text-nck-slate">{label}</td>
+                      <td className="px-2 py-2">{current || '—'}</td>
+                      <td className="px-2 py-2">{suggested || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {canReviewAi && !app.ai_extraction.reviewed_at && app.ai_extraction.status !== 'pending' && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={aiReviewMutation.isPending}
+                  onClick={() => aiReviewMutation.mutate('accept')}
+                  className="rounded-xl bg-nck-green px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  Accept suggestions
+                </button>
+                <button
+                  type="button"
+                  disabled={aiReviewMutation.isPending}
+                  onClick={() => aiReviewMutation.mutate('reject')}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 disabled:opacity-60"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+            <p className="text-xs text-slate-500">
+              Accept fills empty applicant fields only. It does not overwrite existing values or change hiring status.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">

@@ -129,6 +129,7 @@ class ReportController extends Controller
             'qualification' => ['nullable', 'string', 'max:64'],
             'duplicates' => ['nullable', 'string', 'max:32'],
             'match' => ['nullable', 'string', 'max:32'],
+            'documents' => ['nullable', 'string', 'in:with,without,has,none,yes,no,missing'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
@@ -143,6 +144,7 @@ class ReportController extends Controller
             $validated['qualification'] ?? null,
             $validated['duplicates'] ?? null,
             $validated['match'] ?? null,
+            $validated['documents'] ?? null,
         );
 
         return ApiResponse::success($payload);
@@ -157,6 +159,7 @@ class ReportController extends Controller
             'qualification' => ['nullable', 'string', 'max:64'],
             'duplicates' => ['nullable', 'string', 'max:32'],
             'match' => ['nullable', 'string', 'max:32'],
+            'documents' => ['nullable', 'string', 'in:with,without,has,none,yes,no,missing'],
             'include_unassigned' => ['nullable', 'boolean'],
             'unassigned_only' => ['nullable', 'boolean'],
             'source' => ['nullable', 'string', 'in:mailbox,myjobs'],
@@ -174,6 +177,7 @@ class ReportController extends Controller
                 $validated['qualification'] ?? null,
                 $validated['duplicates'] ?? null,
                 $validated['match'] ?? null,
+                $validated['documents'] ?? null,
             );
             $suffix = $category === 'unassigned' ? 'unassigned' : $category;
         } elseif ($request->boolean('unassigned_only')) {

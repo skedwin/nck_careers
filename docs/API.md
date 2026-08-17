@@ -38,7 +38,7 @@ Unauthenticated (HTTP 401) / Forbidden (HTTP 403) follow the same `success: fals
 | POST | `/auth/dev-login` | No* | Local fallback (`AUTH_DEV_LOGIN=true`) |
 | POST | `/auth/logout` | Yes | Revoke current token |
 | GET | `/auth/me` | Yes | Current user + roles/permissions |
-| GET | `/dashboard` | Yes | Stub metrics (zeros until Phase 10) |
+| GET | `/dashboard` | Yes | Live metrics |
 | GET | `/settings` | Yes (`settings.view`) | Public system settings |
 | GET | `/mailbox/status` | Yes (`mailbox.sync` or `applications.view`) | Graph mailbox + sync status |
 | POST | `/mailbox/test-connection` | Yes (`mailbox.sync`) | Test Graph token + inbox read |
@@ -55,6 +55,15 @@ Unauthenticated (HTTP 401) / Forbidden (HTTP 403) follow the same `success: fals
 Clients send: `Authorization: Bearer {token}`
 
 Tokens are issued by Sanctum after Microsoft (or approved local) login.
+
+## Applications and AI
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| POST | `/applications/{id}/ai/process` | screening or application update | Queue / run system assessment |
+| POST | `/applications/{id}/ai/review` | screening or application update | `accept` / `reject` / `edit` — never changes hiring status |
+
+See [AI processing](AI_PROCESSING.md).
 
 ## Future endpoint families
 

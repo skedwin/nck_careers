@@ -45,6 +45,10 @@ npm run dev
 
 Set `VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1`.
 
+## AI extraction (optional)
+
+Leave `AI_PROVIDER=mock` and `AI_ENABLED=false` unless you have an OpenAI or Azure OpenAI key. Officers can still run a system assessment from an application. See [AI processing](AI_PROCESSING.md).
+
 ## Local auth for Phase 1
 
 Set `AUTH_DEV_LOGIN=true` and use the seeded System Administrator credentials documented in the README.

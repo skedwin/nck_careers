@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api, { getApiError, type ApiSuccess, type MyJobsListing } from '../lib/api';
 import { formatEAT } from '../lib/dates';
 import { downloadAuthorized } from '../lib/download';
@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext';
 
 const EXISTENCE_FILTERS = [
   { value: '', label: 'All MyJobs applicants' },
+  { value: 'both', label: 'In MyJobs and email lists' },
+  { value: 'myjobs_only', label: 'MyJobs portal only' },
   { value: 'in_system', label: 'Already in system' },
   { value: 'missing', label: 'Not in system' },
   { value: 'email', label: 'Matched by email' },
@@ -21,30 +23,18 @@ function cell(value: string | number | null | undefined): string {
   return String(value);
 }
 
-function matchLabel(match: string): string {
-  switch (match) {
-    case 'email_and_name':
-      return 'Email + name';
-    case 'email':
-      return 'Email';
-    case 'name':
-      return 'Name';
-    default:
-      return 'Not found';
-  }
-}
-
 export default function MyJobsPage() {
   const { user } = useAuth();
   const canImport =
     (user?.permissions?.includes('applications.create') ?? false) ||
     (user?.permissions?.includes('applications.update') ?? false);
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
   const [file, setFile] = useState('');
-  const [existence, setExistence] = useState('');
+  const [existence, setExistence] = useState(searchParams.get('existence') ?? '');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
@@ -100,6 +90,27 @@ export default function MyJobsPage() {
     },
   });
 
+  const linkMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post<
+        ApiSuccess<{
+          zips_extracted: number;
+          packs: number;
+          linked: number;
+          documents: number;
+          unmatched: number;
+          ambiguous: number;
+          skipped: number;
+        }>
+      >('/myjobs/link-attachments');
+      return response.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['applications'] });
+      void queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+  });
+
   const data = listQuery.data;
   const rows = data?.rows ?? [];
   const meta = data?.meta;
@@ -112,7 +123,8 @@ export default function MyJobsPage() {
           <h2 className="font-display text-3xl font-semibold text-nck-slate">MyJobs</h2>
           <p className="mt-1 text-sm text-slate-600">
             Applicants submitted through My Jobs In Kenya. Import creates MyJobs applications and fills
-            profiles from the spreadsheet (education, gender, phone, current job, salary, age, score).
+            profiles from the spreadsheet. Use the filters to see people who also applied by email, or who
+            appear only on the MyJobs portal.
             {data?.generated_at ? ` As of ${formatEAT(data.generated_at)}.` : ''}
           </p>
         </div>
@@ -127,6 +139,16 @@ export default function MyJobsPage() {
               {importMutation.isPending ? 'Importing…' : 'Import as applications'}
             </button>
           )}
+          {canImport && (
+            <button
+              type="button"
+              disabled={linkMutation.isPending}
+              onClick={() => linkMutation.mutate()}
+              className="rounded-xl border border-nck-green/20 bg-nck-greenLight px-4 py-2.5 text-sm font-semibold text-nck-green disabled:opacity-60"
+            >
+              {linkMutation.isPending ? 'Linking…' : 'Link attachments'}
+            </button>
+          )}
           <button
             type="button"
             disabled={exporting || !data}
@@ -139,35 +161,53 @@ export default function MyJobsPage() {
       </div>
 
       {totals && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <div className="rounded-2xl border border-nck-green/10 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Listed</p>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <button
+            type="button"
+            onClick={() => {
+              setExistence('');
+              setPage(1);
+              setSearchParams({});
+            }}
+            className="rounded-2xl border border-nck-green/10 bg-white p-4 text-left shadow-sm hover:border-nck-green/30"
+          >
+            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Listed on MyJobs</p>
             <p className="mt-2 font-display text-3xl font-semibold text-nck-green">
               {totals.listed.toLocaleString()}
             </p>
-          </div>
-          <div className="rounded-2xl border border-nck-green/10 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">In system</p>
-            <p className="mt-2 font-display text-3xl font-semibold text-nck-green">
-              {totals.in_system.toLocaleString()}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setExistence('both');
+              setPage(1);
+              setSearchParams({ existence: 'both' });
+            }}
+            className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left shadow-sm hover:border-amber-400"
+          >
+            <p className="text-xs uppercase tracking-[0.14em] text-amber-800">In MyJobs and email</p>
+            <p className="mt-2 font-display text-3xl font-semibold text-amber-900">
+              {(totals.also_in_mailbox ?? 0).toLocaleString()}
             </p>
-          </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setExistence('myjobs_only');
+              setPage(1);
+              setSearchParams({ existence: 'myjobs_only' });
+            }}
+            className="rounded-2xl border border-nck-green/10 bg-white p-4 text-left shadow-sm hover:border-nck-green/30"
+          >
+            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">MyJobs portal only</p>
+            <p className="mt-2 font-display text-3xl font-semibold text-nck-green">
+              {(totals.myjobs_only ?? 0).toLocaleString()}
+            </p>
+          </button>
           <div className="rounded-2xl border border-nck-green/10 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Not in system</p>
+            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Not yet in system</p>
             <p className="mt-2 font-display text-3xl font-semibold text-amber-800">
               {totals.missing.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-nck-green/10 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">By email</p>
-            <p className="mt-2 font-display text-3xl font-semibold text-nck-green">
-              {totals.by_email.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-nck-green/10 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Name only</p>
-            <p className="mt-2 font-display text-3xl font-semibold text-nck-green">
-              {totals.by_name_only.toLocaleString()}
             </p>
           </div>
         </div>
@@ -206,8 +246,14 @@ export default function MyJobsPage() {
         <select
           value={existence}
           onChange={(event) => {
-            setExistence(event.target.value);
+            const value = event.target.value;
+            setExistence(value);
             setPage(1);
+            if (value) {
+              setSearchParams({ existence: value });
+            } else {
+              setSearchParams({});
+            }
           }}
           className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
         >
@@ -240,6 +286,21 @@ export default function MyJobsPage() {
         </div>
       )}
 
+      {(linkMutation.isSuccess || linkMutation.isError) && (
+        <div
+          className={`rounded-xl px-4 py-3 text-sm ${
+            linkMutation.isError
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'border border-nck-green/20 bg-nck-greenLight text-nck-green'
+          }`}
+          role={linkMutation.isError ? 'alert' : 'status'}
+        >
+          {linkMutation.isError
+            ? getApiError(linkMutation.error, 'Linking MyJobs attachments failed.')
+            : `Linked MyJobs attachments: ${linkMutation.data.data.linked} applications, ${linkMutation.data.data.documents} files, ${linkMutation.data.data.unmatched} unmatched, ${linkMutation.data.data.ambiguous} ambiguous.`}
+        </div>
+      )}
+
       {(listQuery.isError || exportError) && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {exportError || getApiError(listQuery.error, 'Unable to load MyJobs list.')}
@@ -254,21 +315,22 @@ export default function MyJobsPage() {
               <th className="px-3 py-2">MyJobs applicant</th>
               <th className="px-3 py-2">Email / Phone</th>
               <th className="px-3 py-2">MyJobs list</th>
-              <th className="px-3 py-2">In system</th>
-              <th className="px-3 py-2">Matched application</th>
+              <th className="px-3 py-2">Channel</th>
+              <th className="px-3 py-2">Email application</th>
+              <th className="px-3 py-2">MyJobs application</th>
             </tr>
           </thead>
           <tbody>
             {listQuery.isLoading && (
               <tr>
-                <td className="px-3 py-4 text-slate-500" colSpan={6}>
+                <td className="px-3 py-4 text-slate-500" colSpan={7}>
                   Loading MyJobs applicants…
                 </td>
               </tr>
             )}
             {!listQuery.isLoading && rows.length === 0 && (
               <tr>
-                <td className="px-3 py-4 text-slate-500" colSpan={6}>
+                <td className="px-3 py-4 text-slate-500" colSpan={7}>
                   No MyJobs rows match these filters.
                 </td>
               </tr>
@@ -296,41 +358,40 @@ export default function MyJobsPage() {
                   <p className="text-xs text-slate-500">{row.file.replace(/\.xlsx$/i, '')}</p>
                 </td>
                 <td className="px-3 py-2">
-                  {row.in_system ? (
-                    <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-                      Yes · {matchLabel(row.match)}
+                  {row.also_in_mailbox ? (
+                    <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                      MyJobs + email
                     </span>
                   ) : (
-                    <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                      No
+                    <span className="inline-flex rounded-full bg-nck-greenLight px-2 py-0.5 text-xs font-semibold text-nck-green">
+                      MyJobs only
                     </span>
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  {row.matches.length === 0 && <span className="text-slate-500">—</span>}
-                  {row.matches.map((match) => (
-                    <div key={match.applicant_id} className="mb-2 last:mb-0">
+                  {(row.mailbox_applications ?? []).length === 0 && <span className="text-slate-500">—</span>}
+                  {(row.mailbox_applications ?? []).map((application) => (
+                    <p key={application.application_id} className="text-xs">
                       <Link
-                        className="font-medium text-nck-green hover:underline"
-                        to={`/applicants/${match.applicant_id}`}
+                        className="font-semibold text-nck-green hover:underline"
+                        to={`/applications/${application.application_id}`}
                       >
-                        {cell(match.applicant_name)}
+                        {application.application_reference}
                       </Link>
-                      <p className="text-xs text-slate-500">
-                        {cell(match.applicant_email)} · {matchLabel(match.matched_on ?? '')}
-                      </p>
-                      {(match.applications ?? []).map((application) => (
-                        <p key={application.application_id} className="text-xs">
-                          <Link
-                            className="text-nck-green hover:underline"
-                            to={`/applications/${application.application_id}`}
-                          >
-                            {application.application_reference}
-                          </Link>
-                          {application.position_code ? ` · ${application.position_code}` : ''}
-                        </p>
-                      ))}
-                    </div>
+                    </p>
+                  ))}
+                </td>
+                <td className="px-3 py-2">
+                  {(row.myjobs_applications ?? []).length === 0 && <span className="text-slate-500">—</span>}
+                  {(row.myjobs_applications ?? []).map((application) => (
+                    <p key={application.application_id} className="text-xs">
+                      <Link
+                        className="font-semibold text-nck-green hover:underline"
+                        to={`/applications/${application.application_id}`}
+                      >
+                        {application.application_reference}
+                      </Link>
+                    </p>
                   ))}
                 </td>
               </tr>

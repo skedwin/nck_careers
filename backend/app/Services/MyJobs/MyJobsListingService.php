@@ -52,6 +52,7 @@ class MyJobsListingService
         }
 
         $inSystem = count(array_filter($all, fn (array $row) => $row['in_system']));
+        $alsoInMailbox = count(array_filter($all, fn (array $row) => ! empty($row['also_in_mailbox'])));
 
         return [
             'generated_at' => NairobiDate::iso(now()),
@@ -60,6 +61,8 @@ class MyJobsListingService
                 'listed' => count($all),
                 'in_system' => $inSystem,
                 'missing' => count($all) - $inSystem,
+                'also_in_mailbox' => $alsoInMailbox,
+                'myjobs_only' => count($all) - $alsoInMailbox,
                 'by_email' => count(array_filter($all, fn (array $row) => $row['exists_by_email'])),
                 'by_name' => count(array_filter($all, fn (array $row) => $row['exists_by_name'])),
                 'by_name_only' => count(array_filter($all, fn (array $row) => $row['exists_by_name'] && ! $row['exists_by_email'])),
@@ -122,6 +125,12 @@ class MyJobsListingService
             if (in_array($mode, ['email_only'], true) && (! $row['exists_by_email'] || $row['exists_by_name'])) {
                 return false;
             }
+            if (in_array($mode, ['both', 'also_in_mailbox', 'duplicates'], true) && empty($row['also_in_mailbox'])) {
+                return false;
+            }
+            if (in_array($mode, ['myjobs_only', 'portal_only'], true) && ! empty($row['also_in_mailbox'])) {
+                return false;
+            }
 
             $q = strtolower(trim((string) $search));
             if ($q === '') {
@@ -146,21 +155,69 @@ class MyJobsListingService
     public function matchedRows(): array
     {
         $dir = $this->directory();
-        $stamp = $this->directoryStamp($dir);
 
-        return Cache::remember('myjobs.listing.'.$stamp, 600, function () use ($dir): array {
+        return Cache::remember($this->listingCacheKey(), 600, function () use ($dir): array {
             return $this->buildRows($dir);
         });
     }
 
     public function forgetCache(): void
     {
-        Cache::forget('myjobs.listing.'.$this->directoryStamp($this->directory()));
+        $current = (int) Cache::get('myjobs.listing.version', 1);
+        Cache::forever('myjobs.listing.version', $current + 1);
+    }
+
+    private function listingCacheKey(): string
+    {
+        $version = max(1, (int) Cache::get('myjobs.listing.version', 1));
+
+        return 'myjobs.listing.v'.$version.'.'.$this->directoryStamp($this->directory());
     }
 
     public function normalizeNamePublic(string $name): string
     {
         return $this->normalizeName($name);
+    }
+
+    public function namesMatch(string $left, string $right): bool
+    {
+        $a = $this->normalizeName($left);
+        $b = $this->normalizeName($right);
+        if ($a === '' || $b === '') {
+            return false;
+        }
+        if ($a === $b) {
+            return true;
+        }
+
+        $aTokens = $this->nameTokens($a);
+        $bTokens = $this->nameTokens($b);
+        if ($aTokens === [] || $bTokens === []) {
+            return false;
+        }
+        if ($this->tokenKey($aTokens) === $this->tokenKey($bTokens)) {
+            return true;
+        }
+
+        $aFirstLast = $this->firstLastKey($aTokens);
+        $bFirstLast = $this->firstLastKey($bTokens);
+        if ($aFirstLast && $aFirstLast === $bFirstLast) {
+            return true;
+        }
+
+        $shorter = count($aTokens) <= count($bTokens) ? $aTokens : $bTokens;
+        $longer = count($aTokens) <= count($bTokens) ? $bTokens : $aTokens;
+        if (count($shorter) < 2) {
+            return false;
+        }
+
+        foreach ($shorter as $token) {
+            if (! in_array($token, $longer, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -247,6 +304,8 @@ class MyJobsListingService
                     $match = 'name';
                 }
 
+                $channel = $this->channelFromMatches($merged, $mapped['id']);
+
                 $serial++;
                 $rows[] = [
                     'serial_no' => $serial,
@@ -269,6 +328,10 @@ class MyJobsListingService
                     'exists_by_name' => $existsByName,
                     'match' => $match,
                     'matches' => $merged,
+                    'also_in_mailbox' => $channel['also_in_mailbox'],
+                    'channel' => $channel['also_in_mailbox'] ? 'both' : 'myjobs_only',
+                    'mailbox_applications' => $channel['mailbox_applications'],
+                    'myjobs_applications' => $channel['myjobs_applications'],
                 ];
             }
         }
@@ -393,14 +456,60 @@ class MyJobsListingService
         return array_values($byId);
     }
 
+    /**
+     * @param  list<array<string, mixed>>  $matches
+     * @return array{
+     *   also_in_mailbox: bool,
+     *   mailbox_applications: list<array<string, mixed>>,
+     *   myjobs_applications: list<array<string, mixed>>
+     * }
+     */
+    public function channelFromMatches(array $matches, ?int $positionId): array
+    {
+        $mailbox = [];
+        $myjobs = [];
+
+        foreach ($matches as $match) {
+            foreach ($match['applications'] ?? [] as $application) {
+                if ($positionId && (int) ($application['position_id'] ?? 0) !== $positionId) {
+                    continue;
+                }
+                $row = $application + [
+                    'applicant_id' => $match['applicant_id'] ?? null,
+                    'applicant_name' => $match['applicant_name'] ?? null,
+                    'applicant_email' => $match['applicant_email'] ?? null,
+                    'matched_on' => $match['matched_on'] ?? null,
+                ];
+                if ($this->isMailboxSource($application['source'] ?? null)) {
+                    $mailbox[(int) $application['application_id']] = $row;
+                } else {
+                    $myjobs[(int) $application['application_id']] = $row;
+                }
+            }
+        }
+
+        return [
+            'also_in_mailbox' => $mailbox !== [],
+            'mailbox_applications' => array_values($mailbox),
+            'myjobs_applications' => array_values($myjobs),
+        ];
+    }
+
+    public function isMailboxSource(mixed $source): bool
+    {
+        return strcasecmp(trim((string) $source), 'myjobs') !== 0;
+    }
+
     private function applicantPayload(Applicant $applicant): array
     {
         $applications = $applicant->applications->map(function (Application $application): array {
             return [
                 'application_id' => $application->id,
                 'application_reference' => $application->application_reference,
+                'position_id' => $application->position_id,
                 'position_code' => $application->position?->reference_code,
                 'position_title' => $application->position?->title,
+                'source' => $application->source,
             ];
         })->values()->all();
 

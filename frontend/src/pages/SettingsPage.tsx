@@ -89,10 +89,26 @@ export default function SettingsPage() {
             </label>
             <input
               id={`setting-${key}`}
-              value={value}
+              type={value === 'true' || value === 'false' ? 'checkbox' : 'text'}
+              checked={value === 'true' || value === 'false' ? value === 'true' : undefined}
+              value={value === 'true' || value === 'false' ? undefined : value}
               disabled={!canManage || updateMutation.isPending}
-              onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
+              onChange={(event) =>
+                setDrafts((current) => ({
+                  ...current,
+                  [key]:
+                    event.target.type === 'checkbox'
+                      ? event.target.checked
+                        ? 'true'
+                        : 'false'
+                      : event.target.value,
+                }))
+              }
+              className={
+                value === 'true' || value === 'false'
+                  ? 'h-4 w-4 rounded border-slate-300 text-nck-green'
+                  : 'rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50'
+              }
             />
             {canManage && (
               <button

@@ -6,6 +6,7 @@ use App\Models\Applicant;
 use App\Models\Application;
 use App\Models\ApplicationStatusHistory;
 use App\Models\Position;
+use App\Services\AI\ApplicationAiProcessor;
 use App\Services\Applications\ApplicationProfileEnricher;
 use App\Support\NairobiDate;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ class MyJobsImportService
         private readonly MyJobsProfileExtractor $profiles,
         private readonly ApplicationProfileEnricher $enricher,
         private readonly MyJobsListingService $listing,
+        private readonly ApplicationAiProcessor $aiProcessor,
     ) {
     }
 
@@ -121,6 +123,7 @@ class MyJobsImportService
             ]);
 
             $this->applyProfile($application, $applicant, $extracted, $row, $key, true, true);
+            $this->aiProcessor->queue($application);
 
             return 'created';
         });
@@ -187,7 +190,11 @@ class MyJobsImportService
             return null;
         }
 
+        // Only reuse an existing MyJobs application. A mailbox application for the
+        // same person/vacancy must stay on the mailbox long listing; MyJobs import
+        // creates a separate source=myjobs record so both reports stay complete.
         return Application::query()
+            ->where('source', 'myjobs')
             ->where('applicant_id', $applicant->id)
             ->where('position_id', $positionId)
             ->first();
@@ -205,6 +212,7 @@ class MyJobsImportService
         }
 
         return Application::query()
+            ->where('source', 'myjobs')
             ->where('applicant_id', $applicant->id)
             ->where('position_id', $positionId)
             ->first();

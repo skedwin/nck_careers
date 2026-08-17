@@ -38,3 +38,13 @@ Schedule::call(function () {
 })->name('mailbox-attachment-refill')
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command('mailbox:convert-applications --limit=50')
+    ->name('mailbox-convert-applications')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Schedule::command('ai:process-applications --limit=25')
+    ->name('ai-process-applications')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();

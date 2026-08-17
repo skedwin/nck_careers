@@ -117,20 +117,21 @@ export default function ScreeningPage() {
                 <th className="px-2 py-2">Reference</th>
                 <th className="px-2 py-2">Applicant</th>
                 <th className="px-2 py-2">Status</th>
+                <th className="px-2 py-2">AI</th>
                 <th className="px-2 py-2">Received</th>
               </tr>
             </thead>
             <tbody>
               {listQuery.isLoading && (
                 <tr>
-                  <td className="px-2 py-4 text-slate-500" colSpan={4}>
+                  <td className="px-2 py-4 text-slate-500" colSpan={5}>
                     Loading…
                   </td>
                 </tr>
               )}
               {!listQuery.isLoading && items.length === 0 && (
                 <tr>
-                  <td className="px-2 py-4 text-slate-500" colSpan={4}>
+                  <td className="px-2 py-4 text-slate-500" colSpan={5}>
                     No applications currently need screening.
                   </td>
                 </tr>
@@ -147,6 +148,7 @@ export default function ScreeningPage() {
                   <td className="px-2 py-2 font-semibold text-nck-green">{item.application_reference}</td>
                   <td className="px-2 py-2">{item.applicant?.full_name ?? '—'}</td>
                   <td className="px-2 py-2">{humanize(item.screening_status)}</td>
+                  <td className="px-2 py-2">{item.ai_extraction_status ? humanize(item.ai_extraction_status) : '—'}</td>
                   <td className="px-2 py-2 whitespace-nowrap">{formatEAT(item.received_at)}</td>
                 </tr>
               ))}

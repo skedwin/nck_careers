@@ -4,6 +4,11 @@ namespace App\Services\AI;
 
 class MockAIService implements AIServiceInterface
 {
+    public function providerName(): string
+    {
+        return 'mock';
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
@@ -58,15 +63,18 @@ class MockAIService implements AIServiceInterface
 
     private function matchName(string $subject, string $body): ?string
     {
-        if (preg_match('/\b(?:from|applicant|name)\s*[:\-]\s*([A-Z][a-zA-Z\'\-]+(?:\s+[A-Z][a-zA-Z\'\-]+){1,3})/u', $body, $m)) {
-            return trim($m[1]);
-        }
+        $pattern = '/\b(?:from|applicant|full\s*name|name)\s*[:\-]\s*([A-Z][a-zA-Z\'\-]+(?:[ \t]+[A-Z][a-zA-Z\'\-]+){1,3})/iu';
 
-        if (preg_match('/application(?:\s+for)?\s*[:\-]?\s*(.+)$/iu', $subject, $m)) {
-            $candidate = trim($m[1]);
-            if ($candidate !== '' && ! str_contains(mb_strtolower($candidate), 'nursing')) {
-                return $candidate;
+        if (preg_match($pattern, $body, $m) || preg_match($pattern, $subject, $m)) {
+            $name = trim($m[1]);
+            $blocked = ['email', 'phone', 'registration', 'nck', 'application'];
+            foreach ($blocked as $word) {
+                if (str_contains(mb_strtolower($name), $word)) {
+                    return null;
+                }
             }
+
+            return $name;
         }
 
         return null;
@@ -92,7 +100,7 @@ class MockAIService implements AIServiceInterface
 
     private function matchRegistration(string $text): ?string
     {
-        if (preg_match('/\b(?:reg(?:istration)?(?:\s*(?:no|number|#))?|nck)\s*[:\-]?\s*([A-Z0-9\-\/]{4,20})\b/i', $text, $m)) {
+        if (preg_match('/\b(?:reg(?:istration)?\s*(?:no|number|#)|nck\s*(?:reg(?:istration)?|no|number|#))\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-\/]{3,19})\b/i', $text, $m)) {
             return strtoupper($m[1]);
         }
 

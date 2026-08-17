@@ -37,6 +37,12 @@ const MATCH_FILTERS = [
   { value: 'applicant', label: 'Same applicant' },
 ] as const;
 
+const DOCUMENT_FILTERS = [
+  { value: '', label: 'All applications' },
+  { value: 'with', label: 'With documents' },
+  { value: 'without', label: 'Without documents' },
+] as const;
+
 function cell(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
@@ -64,12 +70,17 @@ export default function LongListingCategoryPage() {
     : '';
   const [matchDraft, setMatchDraft] = useState(initialMatch);
   const [match, setMatch] = useState(initialMatch);
+  const initialDocuments = DOCUMENT_FILTERS.some((option) => option.value === (searchParams.get('documents') ?? ''))
+    ? (searchParams.get('documents') as string)
+    : '';
+  const [documentsDraft, setDocumentsDraft] = useState(initialDocuments);
+  const [documents, setDocuments] = useState(initialDocuments);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   const queryKey = useMemo(
-    () => ['reports-long-listing-category', key, listingSource, page, search, qualification, duplicates, match] as const,
-    [key, listingSource, page, search, qualification, duplicates, match],
+    () => ['reports-long-listing-category', key, listingSource, page, search, qualification, duplicates, match, documents] as const,
+    [key, listingSource, page, search, qualification, duplicates, match, documents],
   );
 
   const detailQuery = useQuery({
@@ -86,6 +97,7 @@ export default function LongListingCategoryPage() {
             qualification: qualification || undefined,
             duplicates: duplicates || undefined,
             match: match || undefined,
+            documents: documents || undefined,
             source: isMyJobs ? 'myjobs' : undefined,
           },
         },
@@ -103,6 +115,7 @@ export default function LongListingCategoryPage() {
       if (qualification) params.set('qualification', qualification);
       if (duplicates) params.set('duplicates', duplicates);
       if (match) params.set('match', match);
+      if (documents) params.set('documents', documents);
       if (isMyJobs) params.set('source', 'myjobs');
       const code =
         detailQuery.data?.category.reference_code?.replace('/', '-') ??
@@ -144,7 +157,7 @@ export default function LongListingCategoryPage() {
   }
 
   const { category, rows, meta, generated_at: generatedAt } = detailQuery.data;
-  const hasFilters = Boolean(search || qualification || duplicates || match);
+  const hasFilters = Boolean(search || qualification || duplicates || match || documents);
 
   return (
     <div className="space-y-6">
@@ -194,6 +207,7 @@ export default function LongListingCategoryPage() {
           setQualification(qualificationDraft);
           setDuplicates(duplicatesDraft);
           setMatch(matchDraft);
+          setDocuments(documentsDraft);
         }}
       >
         <label className="min-w-[240px] flex-1 space-y-1">
@@ -266,6 +280,24 @@ export default function LongListingCategoryPage() {
             ))}
           </select>
         </label>
+        <label className="w-full space-y-1 sm:w-52">
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Documents</span>
+          <select
+            value={documentsDraft}
+            onChange={(event) => {
+              setDocumentsDraft(event.target.value);
+              setDocuments(event.target.value);
+              setPage(1);
+            }}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          >
+            {DOCUMENT_FILTERS.map((option) => (
+              <option key={option.value || 'all-docs'} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="submit"
           className="rounded-xl border border-nck-green/20 bg-nck-greenLight px-4 py-2 text-sm font-semibold text-nck-green"
@@ -285,6 +317,8 @@ export default function LongListingCategoryPage() {
               setDuplicates('');
               setMatchDraft('');
               setMatch('');
+              setDocumentsDraft('');
+              setDocuments('');
               setPage(1);
             }}
           >
@@ -311,13 +345,14 @@ export default function LongListingCategoryPage() {
               <th className="px-2 py-2 min-w-[10rem]">Professional Membership</th>
               <th className="px-2 py-2 min-w-[9rem]">Proficiency in Computer Studies</th>
               <th className="px-2 py-2 whitespace-nowrap">Years of Experience</th>
+              <th className="px-2 py-2 whitespace-nowrap">Documents</th>
               <th className="px-2 py-2 min-w-[12rem]">Comments/Remarks (PWD)</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td className="px-3 py-4 text-slate-500" colSpan={15}>
+                <td className="px-3 py-4 text-slate-500" colSpan={16}>
                   {hasFilters ? 'No applicants match these filters.' : 'No applicants in this category yet.'}
                 </td>
               </tr>
@@ -362,6 +397,19 @@ export default function LongListingCategoryPage() {
                 <td className="px-2 py-2">{cell(row.professional_membership)}</td>
                 <td className="px-2 py-2">{cell(row.computer_proficiency)}</td>
                 <td className="px-2 py-2 tabular-nums">{cell(row.experience_years)}</td>
+                <td className="px-2 py-2 tabular-nums">
+                  {(row.documents_count ?? 0) > 0 ? (
+                    <Link
+                      className="font-semibold text-nck-green hover:underline"
+                      to={`/applications/${row.application_id}`}
+                      title="Open application documents"
+                    >
+                      {row.documents_count}
+                    </Link>
+                  ) : (
+                    <span className="text-slate-400">0</span>
+                  )}
+                </td>
                 <td className="px-2 py-2 text-slate-700">{cell(row.comments_remarks)}</td>
               </tr>
             ))}

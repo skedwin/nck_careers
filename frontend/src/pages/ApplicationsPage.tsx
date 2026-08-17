@@ -30,6 +30,12 @@ const SOURCES = [
   { value: 'careerjet', label: 'Careerjet' },
 ];
 
+const DOCUMENT_FILTERS = [
+  { value: '', label: 'All applications' },
+  { value: 'with', label: 'With documents' },
+  { value: 'without', label: 'Without documents' },
+];
+
 export default function ApplicationsPage() {
   const { user } = useAuth();
   const canConvert = user?.permissions?.includes('applications.create') ?? false;
@@ -39,10 +45,11 @@ export default function ApplicationsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [source, setSource] = useState('');
+  const [documents, setDocuments] = useState('');
 
   const queryKey = useMemo(
-    () => ['applications', page, search, status, source] as const,
-    [page, search, status, source],
+    () => ['applications', page, search, status, source, documents] as const,
+    [page, search, status, source, documents],
   );
 
   const listQuery = useQuery({
@@ -54,6 +61,7 @@ export default function ApplicationsPage() {
           q: search || undefined,
           status: status || undefined,
           source: source || undefined,
+          documents: documents || undefined,
         },
       });
       return response.data.data;
@@ -82,7 +90,7 @@ export default function ApplicationsPage() {
         <div>
           <h2 className="font-display text-3xl font-semibold text-nck-slate">Applications</h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Review mailbox and MyJobs applications. Use the source filter to show MyJobs applications only.
+            Review mailbox and MyJobs applications. Filter by source or whether documents are attached.
           </p>
         </div>
         {canConvert && (
@@ -147,6 +155,20 @@ export default function ApplicationsPage() {
             </option>
           ))}
         </select>
+        <select
+          value={documents}
+          onChange={(event) => {
+            setPage(1);
+            setDocuments(event.target.value);
+          }}
+          className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+        >
+          {DOCUMENT_FILTERS.map((option) => (
+            <option key={option.value || 'all-docs'} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {convertMutation.isSuccess && (
@@ -176,20 +198,21 @@ export default function ApplicationsPage() {
               <th className="px-2 py-2">Source</th>
               <th className="px-2 py-2">Status</th>
               <th className="px-2 py-2">Screening</th>
+              <th className="px-2 py-2">Documents</th>
               <th className="px-2 py-2">Received</th>
             </tr>
           </thead>
           <tbody>
             {listQuery.isLoading && (
               <tr>
-                <td className="px-2 py-4 text-slate-500" colSpan={7}>
+                <td className="px-2 py-4 text-slate-500" colSpan={8}>
                   Loading applications…
                 </td>
               </tr>
             )}
             {!listQuery.isLoading && items.length === 0 && (
               <tr>
-                <td className="px-2 py-4 text-slate-500" colSpan={7}>
+                <td className="px-2 py-4 text-slate-500" colSpan={8}>
                   No applications found. Use Convert from mailbox after syncing mail, or import MyJobs
                   applications.
                 </td>
@@ -216,6 +239,13 @@ export default function ApplicationsPage() {
                 </td>
                 <td className="px-2 py-2">{humanize(item.status)}</td>
                 <td className="px-2 py-2">{humanize(item.screening_status)}</td>
+                <td className="px-2 py-2 tabular-nums">
+                  {(item.documents_count ?? 0) > 0 ? (
+                    <span className="font-semibold text-nck-green">{item.documents_count}</span>
+                  ) : (
+                    <span className="text-slate-400">0</span>
+                  )}
+                </td>
                 <td className="px-2 py-2 whitespace-nowrap">{formatEAT(item.received_at)}</td>
               </tr>
             ))}

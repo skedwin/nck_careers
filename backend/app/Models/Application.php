@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class Application extends Model
@@ -115,6 +116,11 @@ class Application extends Model
         return $this->hasMany(AiExtraction::class);
     }
 
+    public function latestAiExtraction(): HasOne
+    {
+        return $this->hasOne(AiExtraction::class)->latestOfMany();
+    }
+
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
@@ -148,5 +154,21 @@ class Application extends Model
     public function scopeMyJobs(Builder $query, string $column = 'source'): Builder
     {
         return $query->where($column, 'myjobs');
+    }
+
+    /**
+     * @param  'with'|'without'|string|null  $mode
+     */
+    public function scopeDocumentsFilter(Builder $query, ?string $mode = null): Builder
+    {
+        $value = strtolower(trim((string) $mode));
+        if (in_array($value, ['with', 'has', 'yes'], true)) {
+            return $query->whereHas('documents');
+        }
+        if (in_array($value, ['without', 'none', 'missing', 'no'], true)) {
+            return $query->whereDoesntHave('documents');
+        }
+
+        return $query;
     }
 }

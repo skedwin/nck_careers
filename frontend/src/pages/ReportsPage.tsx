@@ -273,6 +273,38 @@ export default function ReportsPage() {
               ))}
             </ul>
           </div>
+
+          <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  MyJobs vs email
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Same vacancy: people on both lists, or MyJobs portal only.
+                </p>
+              </div>
+              <Link to="/myjobs" className="shrink-0 text-sm font-semibold text-nck-green hover:underline">
+                Open MyJobs
+              </Link>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Link
+                to="/myjobs?existence=both"
+                className="rounded-xl bg-amber-50 px-3 py-3 hover:bg-amber-100"
+              >
+                <p className="text-xs uppercase tracking-wide text-amber-800">Both lists</p>
+                <p className="mt-1 font-display text-2xl font-semibold text-amber-900">View</p>
+              </Link>
+              <Link
+                to="/myjobs?existence=myjobs_only"
+                className="rounded-xl bg-nck-mist px-3 py-3 hover:bg-nck-greenLight"
+              >
+                <p className="text-xs uppercase tracking-wide text-slate-500">MyJobs only</p>
+                <p className="mt-1 font-display text-2xl font-semibold text-nck-green">View</p>
+              </Link>
+            </div>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-nck-green/10 bg-white p-5 shadow-sm">

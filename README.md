@@ -48,9 +48,9 @@ nck-careers/
 | 3 | Historical + incremental mail sync | Complete |
 | 4 | Attachments + private storage | **Complete** |
 | 5–6 | Applications, applicants, positions | **Complete (MVP)** |
-| 7–9 | Screening, AI stub, shortlisting | **Complete (MVP)** |
+| 7–9 | Screening, AI extraction + human review, shortlisting | **Complete (MVP)** |
 | 10–11 | Dashboard, reports, users, settings, audit | **Complete (MVP)** |
-| 12 | Production hardening | Planned |
+| 12 | Production hardening | **Complete (docs + scheduler + health)** |
 
 Timezone: Graph/`received_at` are UTC; API and UI present **Africa/Nairobi (EAT, UTC+3)**.
 

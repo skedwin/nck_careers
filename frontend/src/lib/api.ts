@@ -246,11 +246,13 @@ export type ApplicationSummary = {
   status: string;
   screening_status: string;
   source?: string;
+  documents_count?: number;
   received_at?: string | null;
   applicant_id?: number;
   position_id?: number | null;
   applicant?: Applicant | null;
   position?: Position | null;
+  ai_extraction_status?: string | null;
 };
 
 export type ApplicationProfile = {
@@ -310,6 +312,36 @@ export type ApplicationDuplicates = {
   related: ApplicationDuplicateRelated[];
 };
 
+export type AiExtraction = {
+  id: number;
+  provider: string;
+  status: string;
+  confidence?: number | null;
+  low_confidence?: boolean;
+  summary?: string | null;
+  position_hint?: string | null;
+  keywords?: string[];
+  applicant?: {
+    full_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    registration_number?: string | null;
+  };
+  current?: {
+    full_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    registration_number?: string | null;
+    position?: string | null;
+    status?: string | null;
+    screening_status?: string | null;
+  } | null;
+  error?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by?: number | null;
+  created_at?: string | null;
+};
+
 export type Application = ApplicationSummary & {
   notes?: string | null;
   profile?: ApplicationProfile | null;
@@ -317,6 +349,7 @@ export type Application = ApplicationSummary & {
   screening_results?: ScreeningResult[];
   status_history?: StatusHistoryItem[];
   duplicates?: ApplicationDuplicates | null;
+  ai_extraction?: AiExtraction | null;
   mail_message?: {
     id: number;
     subject?: string | null;
@@ -543,6 +576,20 @@ export type MyJobsRow = {
   exists_by_name: boolean;
   match: string;
   matches: MyJobsMatch[];
+  also_in_mailbox?: boolean;
+  channel?: 'both' | 'myjobs_only' | string;
+  mailbox_applications?: Array<{
+    application_id: number;
+    application_reference: string;
+    position_code?: string | null;
+    source?: string | null;
+  }>;
+  myjobs_applications?: Array<{
+    application_id: number;
+    application_reference: string;
+    position_code?: string | null;
+    source?: string | null;
+  }>;
 };
 
 export type MyJobsListing = {
@@ -559,6 +606,8 @@ export type MyJobsListing = {
     listed: number;
     in_system: number;
     missing: number;
+    also_in_mailbox?: number;
+    myjobs_only?: number;
     by_email: number;
     by_name: number;
     by_name_only: number;

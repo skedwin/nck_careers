@@ -18,7 +18,8 @@ class HealthAndAuthTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.status', 'ok');
+            ->assertJsonPath('data.status', 'ok')
+            ->assertJsonPath('data.database', 'ok');
     }
 
     public function test_dev_login_is_disabled_by_default(): void

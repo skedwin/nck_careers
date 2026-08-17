@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AiExtractionController;
 use App\Http\Controllers\Api\V1\ApplicantController;
 use App\Http\Controllers\Api\V1\ApplicationController;
 use App\Http\Controllers\Api\V1\AuditLogController;
@@ -79,8 +80,10 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('permission:applications.update|applications.shortlist|applications.reject');
         Route::post('/applications/{application}/hide-duplicate', [ApplicationController::class, 'hideDuplicate'])
             ->middleware('permission:applications.update');
-        Route::post('/applications/{application}/unhide-duplicate', [ApplicationController::class, 'unhideDuplicate'])
-            ->middleware('permission:applications.update');
+        Route::post('/applications/{application}/ai/process', [AiExtractionController::class, 'process'])
+            ->middleware(['permission:screening.update|applications.update|applications.profile.update', 'throttle:20,1']);
+        Route::post('/applications/{application}/ai/review', [AiExtractionController::class, 'review'])
+            ->middleware(['permission:screening.update|applications.update|applications.profile.update', 'throttle:20,1']);
 
         Route::get('/applicants', [ApplicantController::class, 'index'])
             ->middleware('permission:applications.view');
@@ -126,6 +129,8 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('permission:applications.view|reports.view');
         Route::post('/myjobs/import', [MyJobsController::class, 'import'])
             ->middleware(['permission:applications.create|applications.update', 'throttle:5,1']);
+        Route::post('/myjobs/link-attachments', [MyJobsController::class, 'linkAttachments'])
+            ->middleware(['permission:applications.create|applications.update', 'throttle:3,1']);
 
         Route::get('/reports/summary', [ReportController::class, 'summary'])
             ->middleware('permission:reports.view');

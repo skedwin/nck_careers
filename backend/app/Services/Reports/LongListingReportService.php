@@ -125,6 +125,7 @@ class LongListingReportService
         ?string $qualification = null,
         ?string $duplicates = null,
         ?string $match = null,
+        ?string $documents = null,
     ): array {
         $this->positionScope->assertCanAccessCategoryKey($categoryKey);
         $category = $this->resolveCategoryMeta($categoryKey);
@@ -135,6 +136,7 @@ class LongListingReportService
         $this->applySearch($query, $search);
         $this->applyQualificationFilter($query, $qualification);
         $this->applyDuplicatesFilter($query, $duplicates, $duplicateMeta, $match);
+        $this->applyDocumentsFilter($query, $documents);
 
         /** @var LengthAwarePaginator<int, Application> $paginator */
         $paginator = $query
@@ -280,6 +282,7 @@ class LongListingReportService
         ?string $qualification = null,
         ?string $duplicates = null,
         ?string $match = null,
+        ?string $documents = null,
     ): array {
         $this->positionScope->assertCanAccessCategoryKey($categoryKey);
         $category = $this->resolveCategoryMeta($categoryKey);
@@ -288,6 +291,7 @@ class LongListingReportService
         $this->applySearch($query, $search);
         $this->applyQualificationFilter($query, $qualification);
         $this->applyDuplicatesFilter($query, $duplicates, $duplicateMeta, $match);
+        $this->applyDocumentsFilter($query, $documents);
         $apps = $query->orderBy('received_at')->orderBy('id')->get();
 
         $out = [];
@@ -325,6 +329,7 @@ class LongListingReportService
             'Proficiency in Computer Studies',
             'Years of Working Experience',
             'Comments/Remarks-- for PWD must indicated or attach in the certificates',
+            'Documents',
         ];
 
         if ($includeCategory) {
@@ -1112,6 +1117,11 @@ class LongListingReportService
         $query->where('highest_qualification', $value);
     }
 
+    private function applyDocumentsFilter(Builder $query, ?string $documents): void
+    {
+        $query->documentsFilter($documents);
+    }
+
     /**
      * @return Collection<int, Application>
      */
@@ -1247,6 +1257,7 @@ class LongListingReportService
             'Proficiency in Computer Studies' => $row['computer_proficiency'],
             'Years of Working Experience' => $row['experience_years'],
             'Comments/Remarks-- for PWD must indicated or attach in the certificates' => $this->commentsWithDuplicate($row),
+            'Documents' => (int) ($row['documents_count'] ?? 0),
         ];
 
         if ($includeCategory) {

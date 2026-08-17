@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationStatusHistory;
 use App\Models\MailMessage;
+use App\Services\AI\ApplicationAiProcessor;
 use App\Services\Audit\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,6 +20,7 @@ class ApplicationIngestionService
         private readonly PositionMatcher $positionMatcher,
         private readonly ApplicationProfileEnricher $profileEnricher,
         private readonly JobBoardApplicantResolver $jobBoards,
+        private readonly ApplicationAiProcessor $aiProcessor,
     ) {
     }
 
@@ -65,6 +67,7 @@ class ApplicationIngestionService
 
             $application->loadMissing('applicant');
             $this->profileEnricher->enrichFromMailMessage($message, $application);
+            $this->aiProcessor->queue($application);
 
             $this->auditLogger->log('application.created_from_mail', $application, null, [
                 'mail_message_id' => $message->id,

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationStatusHistory;
+use App\Services\AI\ApplicationAiProcessor;
 use App\Services\Access\PositionScopeService;
 use App\Services\Applications\ApplicationIngestionService;
 use App\Services\Audit\AuditLogger;
@@ -33,6 +34,7 @@ class ApplicationController extends Controller
         private readonly AuditLogger $auditLogger,
         private readonly LongListingReportService $longListing,
         private readonly PositionScopeService $positionScope,
+        private readonly ApplicationAiProcessor $aiProcessor,
     ) {
     }
 
@@ -69,6 +71,9 @@ class ApplicationController extends Controller
             $query->where('source', $source);
         }
 
+        $query->documentsFilter($request->query('documents'));
+        $query->withCount('documents');
+
         $this->positionScope->scopeApplicationsQuery($query);
 
         $paginator = $query->paginate((int) $request->query('per_page', 20));
@@ -89,6 +94,7 @@ class ApplicationController extends Controller
             'screeningResults',
             'statusHistory.user:id,name,display_name,email',
             'mailMessage',
+            'latestAiExtraction',
         ]);
 
         return ApiResponse::success($this->serializeDetail($application));
@@ -441,6 +447,8 @@ class ApplicationController extends Controller
             'status' => $application->status,
             'screening_status' => $application->screening_status,
             'source' => $application->source,
+            'documents_count' => (int) ($application->documents_count
+                ?? $application->documents->count()),
             'received_at' => NairobiDate::iso($application->received_at),
             'created_at' => NairobiDate::iso($application->created_at),
             'updated_at' => NairobiDate::iso($application->updated_at),
@@ -563,6 +571,12 @@ class ApplicationController extends Controller
                 'attachments_status' => $application->mailMessage->attachments_status,
             ]
             : null;
+
+        $data['ai_extraction'] = $this->aiProcessor->serialize(
+            $application->relationLoaded('latestAiExtraction')
+                ? $application->latestAiExtraction
+                : $application->aiExtractions()->latest('id')->first()
+        );
 
         $data['duplicates'] = $this->longListing->duplicateDetailsForApplication($application);
 

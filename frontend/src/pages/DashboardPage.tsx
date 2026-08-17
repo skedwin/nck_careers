@@ -45,7 +45,7 @@ export default function DashboardPage() {
         <StatCard label="Eligible" value={data.eligible} />
         <StatCard label="Needs review" value={data.needs_review} />
         <StatCard label="Shortlisted" value={data.shortlisted} />
-        <StatCard label="Pending AI" value={data.pending_ai_processing} />
+        <StatCard label="Pending AI review" value={data.pending_ai_processing} />
       </div>
 
       <div className="rounded-2xl border border-nck-green/10 bg-white p-5">

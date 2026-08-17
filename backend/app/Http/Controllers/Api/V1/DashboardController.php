@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiExtraction;
 use App\Models\Application;
 use App\Models\MailAttachment;
 use App\Models\MailMessage;
@@ -68,7 +69,10 @@ class DashboardController extends Controller
             'needs_review' => (int) ($byStatus[Application::STATUS_NEEDS_REVIEW] ?? 0)
                 + Application::query()->notMyJobs()->where('screening_status', 'needs_review')->count(),
             'shortlisted' => (int) ($byStatus[Application::STATUS_SHORTLISTED] ?? 0),
-            'pending_ai_processing' => Application::query()->notMyJobs()->where('screening_status', 'pending')->count(),
+            'pending_ai_processing' => AiExtraction::query()
+                ->whereIn('status', [AiExtraction::STATUS_PENDING, AiExtraction::STATUS_COMPLETED, AiExtraction::STATUS_FAILED])
+                ->whereNull('reviewed_at')
+                ->count(),
             'failed_document_processing' => MailAttachment::query()->where('download_status', 'failed')->count(),
             'mail_messages_total' => MailMessage::query()->count(),
             'mail_attachments_pending' => MailAttachment::query()->where('download_status', 'pending')->count(),

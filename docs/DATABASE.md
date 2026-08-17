@@ -8,7 +8,9 @@
 - `mail_sync_errors` — per-message/page failures
 - `mail_sync_states` — pause flag, deltaLink, last success
 
-## Planned domain tables (Phases 3–8)
+## Domain tables (Phases 3–8, implemented)
+
+Qualifications / employment history remain on the application profile JSON rather than separate tables.
 
 ```
 positions ──┬── position_criteria
