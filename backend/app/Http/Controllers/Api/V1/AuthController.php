@@ -159,6 +159,37 @@ class AuthController extends Controller
         return ApiResponse::success(new UserResource($request->user()->load('roles', 'permissions')));
     }
 
+    public function changePassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:10', 'confirmed'],
+        ]);
+
+        $user = $request->user();
+        if (! $user instanceof User) {
+            return ApiResponse::error('Unauthenticated.', 401);
+        }
+
+        if (! $user->password || ! Hash::check($validated['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['The current password is incorrect.'],
+            ]);
+        }
+
+        $user->forceFill(['password' => $validated['password']])->save();
+
+        $currentId = $user->currentAccessToken()?->id;
+        $user->tokens()->when(
+            $currentId,
+            fn ($query) => $query->where('id', '!=', $currentId)
+        )->delete();
+
+        $this->auditLogger->log('auth.password_changed', $user, null, ['email' => $user->email], $request);
+
+        return ApiResponse::success(null, 'Password updated.');
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $user = $request->user();

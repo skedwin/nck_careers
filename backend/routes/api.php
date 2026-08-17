@@ -29,6 +29,7 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware('auth:sanctum')->group(function (): void {
             Route::get('/me', [AuthController::class, 'me']);
             Route::post('/logout', [AuthController::class, 'logout']);
+            Route::post('/password', [AuthController::class, 'changePassword'])->middleware('throttle:10,1');
         });
     });
 
@@ -148,6 +149,8 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('permission:users.manage');
         Route::post('/users/{user}/role', [UserController::class, 'updateRole'])
             ->middleware('permission:users.manage');
+        Route::post('/users/{user}/password', [UserController::class, 'updatePassword'])
+            ->middleware(['permission:users.manage', 'throttle:10,1']);
 
         Route::get('/audit-logs', [AuditLogController::class, 'index'])
             ->middleware('permission:audit.view');

@@ -9,6 +9,7 @@ use App\Support\ApiResponse;
 use App\Support\NairobiDate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
@@ -40,6 +41,7 @@ class UserController extends Controller
             'job_title' => $user->job_title,
             'department' => $user->department,
             'is_active' => $user->is_active,
+            'has_password' => filled($user->getRawOriginal('password')),
             'last_login_at' => NairobiDate::iso($user->last_login_at),
             'created_at' => NairobiDate::iso($user->created_at),
             'roles' => $user->getRoleNames()->values(),
@@ -73,5 +75,33 @@ class UserController extends Controller
             'email' => $user->email,
             'roles' => $user->getRoleNames()->values(),
         ], 'User role updated.');
+    }
+
+    public function updatePassword(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'generate' => ['sometimes', 'boolean'],
+            'password' => ['required_without:generate', 'nullable', 'string', 'min:10', 'confirmed'],
+        ]);
+
+        $plain = ! empty($validated['generate'])
+            ? Str::password(16, symbols: true)
+            : (string) $validated['password'];
+
+        $user->forceFill(['password' => $plain])->save();
+        $user->tokens()->delete();
+
+        $this->auditLogger->log('user.password_updated', $user, null, [
+            'email' => $user->email,
+            'generated' => ! empty($validated['generate']),
+        ], $request);
+
+        return ApiResponse::success([
+            'id' => $user->id,
+            'email' => $user->email,
+            'password' => ! empty($validated['generate']) ? $plain : null,
+        ], ! empty($validated['generate'])
+            ? 'Password generated. Save it now — it will not be shown again.'
+            : 'Password updated. The user must sign in again.');
     }
 }

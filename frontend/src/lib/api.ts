@@ -115,6 +115,7 @@ export type User = {
   roles: string[];
   permissions: string[];
   is_active?: boolean;
+  has_password?: boolean;
 };
 
 export type DashboardStats = {

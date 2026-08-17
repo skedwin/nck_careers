@@ -1,5 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import api, { getApiError } from '../lib/api';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', permission: 'applications.view' },
@@ -28,6 +30,48 @@ function canAccessNavItem(permissions: string[] | undefined, required?: string):
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const visibleNavItems = navItems.filter((item) => canAccessNavItem(user?.permissions, item.permission));
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  const closePassword = () => {
+    setPasswordOpen(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError(null);
+    setPasswordSuccess(null);
+  };
+
+  const submitPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Password confirmation does not match.');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await api.post('/auth/password', {
+        current_password: currentPassword,
+        password: newPassword,
+        password_confirmation: confirmPassword,
+      });
+      setPasswordSuccess('Password updated.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      setPasswordError(getApiError(error, 'Unable to update password.'));
+    } finally {
+      setSavingPassword(false);
+    }
+  };
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[280px_1fr]">
@@ -67,6 +111,17 @@ export default function AppLayout() {
             </div>
             <button
               type="button"
+              onClick={() => {
+                setPasswordError(null);
+                setPasswordSuccess(null);
+                setPasswordOpen(true);
+              }}
+              className="rounded-lg border border-nck-green/20 px-3 py-2 text-sm font-medium text-nck-green hover:bg-nck-greenLight"
+            >
+              Change password
+            </button>
+            <button
+              type="button"
               onClick={() => void logout()}
               className="rounded-lg border border-nck-green/20 px-3 py-2 text-sm font-medium text-nck-green hover:bg-nck-greenLight"
             >
@@ -78,6 +133,79 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {passwordOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <form
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            onSubmit={(event) => void submitPassword(event)}
+          >
+            <h3 className="font-display text-xl font-semibold text-nck-slate">Change password</h3>
+            <p className="mt-1 text-sm text-slate-600">Use at least 10 characters.</p>
+            {passwordError && (
+              <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                {passwordError}
+              </p>
+            )}
+            {passwordSuccess && (
+              <p className="mt-3 rounded-xl border border-nck-green/20 bg-nck-greenLight px-3 py-2 text-sm text-nck-green" role="status">
+                {passwordSuccess}
+              </p>
+            )}
+            <label className="mt-4 block space-y-1 text-sm">
+              <span className="text-slate-600">Current password</span>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                required
+                autoComplete="current-password"
+              />
+            </label>
+            <label className="mt-3 block space-y-1 text-sm">
+              <span className="text-slate-600">New password</span>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                minLength={10}
+                required
+                autoComplete="new-password"
+              />
+            </label>
+            <label className="mt-3 block space-y-1 text-sm">
+              <span className="text-slate-600">Confirm new password</span>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2"
+                minLength={10}
+                required
+                autoComplete="new-password"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600"
+                onClick={closePassword}
+              >
+                Close
+              </button>
+              <button
+                type="submit"
+                disabled={savingPassword}
+                className="rounded-xl bg-nck-green px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {savingPassword ? 'Saving…' : 'Update password'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
