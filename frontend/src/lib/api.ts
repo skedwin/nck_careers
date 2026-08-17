@@ -127,6 +127,8 @@ export type DashboardStats = {
   not_eligible: number;
   needs_review: number;
   shortlisted: number;
+  with_documents?: number;
+  without_documents?: number;
   pending_ai_processing: number;
   failed_document_processing: number;
   mailbox_sync: {
@@ -431,6 +433,19 @@ export type ReportSummary = {
   applications_this_week?: number;
   applications_this_month?: number;
   myjobs_total?: number;
+  documents?: {
+    mailbox_with?: number;
+    mailbox_without?: number;
+    myjobs_with?: number;
+    myjobs_without?: number;
+  };
+  myjobs_channels?: {
+    listed?: number;
+    in_system?: number;
+    missing?: number;
+    also_in_mailbox?: number;
+    myjobs_only?: number;
+  };
   generated_at?: string | null;
   mailbox?: {
     messages_total?: number;
@@ -507,6 +522,8 @@ export type LongListingCategorySummary = {
   vacancies?: number | null;
   total_applicants: number;
   duplicate_applicants?: number;
+  with_documents?: number;
+  without_documents?: number;
 };
 
 export type LongListingIndex = {

@@ -45,6 +45,8 @@ export default function DashboardPage() {
         <StatCard label="Eligible" value={data.eligible} />
         <StatCard label="Needs review" value={data.needs_review} />
         <StatCard label="Shortlisted" value={data.shortlisted} />
+        <StatCard label="With documents" value={data.with_documents ?? 0} />
+        <StatCard label="Without documents" value={data.without_documents ?? 0} />
         <StatCard label="Pending AI review" value={data.pending_ai_processing} />
       </div>
 

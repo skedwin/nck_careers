@@ -51,22 +51,10 @@ class MyJobsListingService
             $slice[$i]['serial_no'] = $offset + $i + 1;
         }
 
-        $inSystem = count(array_filter($all, fn (array $row) => $row['in_system']));
-        $alsoInMailbox = count(array_filter($all, fn (array $row) => ! empty($row['also_in_mailbox'])));
-
         return [
             'generated_at' => NairobiDate::iso(now()),
             'files' => $files,
-            'totals' => [
-                'listed' => count($all),
-                'in_system' => $inSystem,
-                'missing' => count($all) - $inSystem,
-                'also_in_mailbox' => $alsoInMailbox,
-                'myjobs_only' => count($all) - $alsoInMailbox,
-                'by_email' => count(array_filter($all, fn (array $row) => $row['exists_by_email'])),
-                'by_name' => count(array_filter($all, fn (array $row) => $row['exists_by_name'])),
-                'by_name_only' => count(array_filter($all, fn (array $row) => $row['exists_by_name'] && ! $row['exists_by_email'])),
-            ],
+            'totals' => $this->totalsFromRows($all),
             'rows' => $slice,
             'meta' => [
                 'current_page' => $page,
@@ -93,6 +81,35 @@ class MyJobsListingService
         }
 
         return $filtered;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function totals(): array
+    {
+        return $this->totalsFromRows($this->matchedRows());
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $all
+     * @return array<string, int>
+     */
+    private function totalsFromRows(array $all): array
+    {
+        $inSystem = count(array_filter($all, fn (array $row) => $row['in_system']));
+        $alsoInMailbox = count(array_filter($all, fn (array $row) => ! empty($row['also_in_mailbox'])));
+
+        return [
+            'listed' => count($all),
+            'in_system' => $inSystem,
+            'missing' => count($all) - $inSystem,
+            'also_in_mailbox' => $alsoInMailbox,
+            'myjobs_only' => count($all) - $alsoInMailbox,
+            'by_email' => count(array_filter($all, fn (array $row) => $row['exists_by_email'])),
+            'by_name' => count(array_filter($all, fn (array $row) => $row['exists_by_name'])),
+            'by_name_only' => count(array_filter($all, fn (array $row) => $row['exists_by_name'] && ! $row['exists_by_email'])),
+        ];
     }
 
     /**

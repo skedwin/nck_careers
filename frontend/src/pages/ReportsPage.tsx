@@ -48,6 +48,8 @@ function LongListingTable({
             <th className="px-4 py-3">Category / Position</th>
             <th className="px-4 py-3">Vacancies</th>
             <th className="px-4 py-3 text-right">Applicants</th>
+            <th className="px-4 py-3 text-right">With docs</th>
+            <th className="px-4 py-3 text-right">No docs</th>
             <th className="px-4 py-3 text-right">Duplicates</th>
             <th className="px-4 py-3" />
           </tr>
@@ -55,7 +57,7 @@ function LongListingTable({
         <tbody>
           {categories.length === 0 && (
             <tr>
-              <td className="px-4 py-4 text-slate-500" colSpan={6}>
+              <td className="px-4 py-4 text-slate-500" colSpan={8}>
                 No categories found.
               </td>
             </tr>
@@ -63,6 +65,8 @@ function LongListingTable({
           {categories.map((category) => {
             const key = category.key || (category.position_id != null ? String(category.position_id) : 'unassigned');
             const duplicates = category.duplicate_applicants ?? 0;
+            const withDocs = category.with_documents ?? 0;
+            const withoutDocs = category.without_documents ?? 0;
             return (
               <tr key={`${source ?? 'mailbox'}-${key}`} className="border-b border-slate-100 hover:bg-nck-mist/40">
                 <td className="px-4 py-3 font-semibold text-nck-green">
@@ -74,6 +78,32 @@ function LongListingTable({
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums font-semibold text-nck-green">
                   {category.total_applicants.toLocaleString()}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {withDocs > 0 ? (
+                    <Link
+                      to={`/reports/long-listing/${encodeURIComponent(key)}?documents=with${sourcePathQs}`}
+                      className="font-semibold text-nck-green hover:underline"
+                      title="Open applications with documents"
+                    >
+                      {withDocs.toLocaleString()}
+                    </Link>
+                  ) : (
+                    <span className="text-slate-500">0</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {withoutDocs > 0 ? (
+                    <Link
+                      to={`/reports/long-listing/${encodeURIComponent(key)}?documents=without${sourcePathQs}`}
+                      className="font-semibold text-amber-800 hover:underline"
+                      title="Open applications without documents"
+                    >
+                      {withoutDocs.toLocaleString()}
+                    </Link>
+                  ) : (
+                    <span className="text-slate-500">0</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
                   {duplicates > 0 ? (
@@ -206,6 +236,10 @@ export default function ReportsPage() {
         <StatCard label="This month" value={data.applications_this_month ?? 0} />
         <StatCard label="MyJobs applications" value={data.myjobs_total ?? 0} />
         <StatCard label="Pending mail apps" value={data.mailbox?.messages_pending_application ?? 0} />
+        <StatCard label="Mailbox with documents" value={data.documents?.mailbox_with ?? 0} />
+        <StatCard label="Mailbox without documents" value={data.documents?.mailbox_without ?? 0} />
+        <StatCard label="MyJobs with documents" value={data.documents?.myjobs_with ?? 0} />
+        <StatCard label="MyJobs without documents" value={data.documents?.myjobs_without ?? 0} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -294,16 +328,26 @@ export default function ReportsPage() {
                 className="rounded-xl bg-amber-50 px-3 py-3 hover:bg-amber-100"
               >
                 <p className="text-xs uppercase tracking-wide text-amber-800">Both lists</p>
-                <p className="mt-1 font-display text-2xl font-semibold text-amber-900">View</p>
+                <p className="mt-1 font-display text-2xl font-semibold text-amber-900">
+                  {(data.myjobs_channels?.also_in_mailbox ?? 0).toLocaleString()}
+                </p>
               </Link>
               <Link
                 to="/myjobs?existence=myjobs_only"
                 className="rounded-xl bg-nck-mist px-3 py-3 hover:bg-nck-greenLight"
               >
                 <p className="text-xs uppercase tracking-wide text-slate-500">MyJobs only</p>
-                <p className="mt-1 font-display text-2xl font-semibold text-nck-green">View</p>
+                <p className="mt-1 font-display text-2xl font-semibold text-nck-green">
+                  {(data.myjobs_channels?.myjobs_only ?? 0).toLocaleString()}
+                </p>
               </Link>
             </div>
+            <p className="mt-3 text-xs text-slate-500">
+              {(data.myjobs_channels?.listed ?? 0).toLocaleString()} listed on MyJobs
+              {(data.myjobs_channels?.missing ?? 0) > 0
+                ? ` · ${(data.myjobs_channels?.missing ?? 0).toLocaleString()} not yet in the system`
+                : ''}
+            </p>
           </div>
         </div>
 

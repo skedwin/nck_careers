@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\MailAttachment;
 use App\Models\MailMessage;
 use App\Services\Access\PositionScopeService;
+use App\Services\MyJobs\MyJobsListingService;
 use App\Services\Reports\LongListingReportService;
 use App\Support\ApiResponse;
 use App\Support\Excel\NckReportExcel;
@@ -22,6 +23,7 @@ class ReportController extends Controller
     public function __construct(
         private readonly LongListingReportService $longListing,
         private readonly PositionScopeService $positionScope,
+        private readonly MyJobsListingService $myJobsListing,
     ) {
     }
 
@@ -81,6 +83,9 @@ class ReportController extends Controller
         $myJobsQuery = Application::query()->myJobs();
         $this->positionScope->scopeApplicationsQuery($myJobsQuery);
 
+        $mailboxDocuments = $this->documentCounts(false);
+        $myJobsDocuments = $this->documentCounts(true);
+
         $payload = [
             'counts_by_status' => $byStatus,
             'counts_by_position' => $byPosition,
@@ -88,10 +93,17 @@ class ReportController extends Controller
             'applications_this_week' => $weekQuery->count(),
             'applications_this_month' => $monthQuery->count(),
             'myjobs_total' => $myJobsQuery->count(),
+            'documents' => [
+                'mailbox_with' => $mailboxDocuments['with'],
+                'mailbox_without' => $mailboxDocuments['without'],
+                'myjobs_with' => $myJobsDocuments['with'],
+                'myjobs_without' => $myJobsDocuments['without'],
+            ],
             'generated_at' => NairobiDate::iso($now),
         ];
 
         if (! $this->positionScope->isRestricted()) {
+            $payload['myjobs_channels'] = $this->myJobsListing->totals();
             $attachmentStats = MailAttachment::query()
                 ->select('download_status', DB::raw('COUNT(*) as total'))
                 ->groupBy('download_status')
@@ -372,5 +384,28 @@ class ReportController extends Controller
     private function listingSource(Request $request): string
     {
         return $request->query('source') === 'myjobs' ? 'myjobs' : 'mailbox';
+    }
+
+    /**
+     * @return array{with: int, without: int, total: int}
+     */
+    private function documentCounts(bool $myJobs): array
+    {
+        $query = Application::query()->whereNull('duplicate_hidden_at');
+        if ($myJobs) {
+            $query->myJobs();
+        } else {
+            $query->notMyJobs();
+        }
+        $this->positionScope->scopeApplicationsQuery($query);
+
+        $total = (clone $query)->count();
+        $with = (clone $query)->whereHas('documents')->count();
+
+        return [
+            'with' => $with,
+            'without' => max(0, $total - $with),
+            'total' => $total,
+        ];
     }
 }

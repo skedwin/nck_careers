@@ -69,6 +69,8 @@ class DashboardController extends Controller
             'needs_review' => (int) ($byStatus[Application::STATUS_NEEDS_REVIEW] ?? 0)
                 + Application::query()->notMyJobs()->where('screening_status', 'needs_review')->count(),
             'shortlisted' => (int) ($byStatus[Application::STATUS_SHORTLISTED] ?? 0),
+            'with_documents' => Application::query()->notMyJobs()->whereNull('duplicate_hidden_at')->whereHas('documents')->count(),
+            'without_documents' => Application::query()->notMyJobs()->whereNull('duplicate_hidden_at')->whereDoesntHave('documents')->count(),
             'pending_ai_processing' => AiExtraction::query()
                 ->whereIn('status', [AiExtraction::STATUS_PENDING, AiExtraction::STATUS_COMPLETED, AiExtraction::STATUS_FAILED])
                 ->whereNull('reviewed_at')

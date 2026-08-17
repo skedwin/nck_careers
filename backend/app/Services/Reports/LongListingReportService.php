@@ -71,8 +71,19 @@ class LongListingReportService
             ->groupBy('position_id')
             ->pluck('total', 'position_id');
 
-        $categories = $positions->map(function (Position $position) use ($counts) {
+        $withDocuments = Application::query()
+            ->whereNull('duplicate_hidden_at')
+            ->whereHas('documents');
+        $this->constrainSource($withDocuments);
+        $withDocuments = $withDocuments
+            ->selectRaw('position_id, COUNT(*) as total')
+            ->groupBy('position_id')
+            ->pluck('total', 'position_id');
+
+        $categories = $positions->map(function (Position $position) use ($counts, $withDocuments) {
             $duplicateCount = count($this->duplicateGroupsForPosition((int) $position->id)['duplicate_application_ids']);
+            $total = (int) ($counts[$position->id] ?? 0);
+            $docs = (int) ($withDocuments[$position->id] ?? 0);
 
             return [
                 'key' => (string) $position->id,
@@ -81,8 +92,10 @@ class LongListingReportService
                 'title' => $position->title,
                 'department' => $position->department,
                 'vacancies' => $position->vacancies,
-                'total_applicants' => (int) ($counts[$position->id] ?? 0),
+                'total_applicants' => $total,
                 'duplicate_applicants' => $duplicateCount,
+                'with_documents' => $docs,
+                'without_documents' => max(0, $total - $docs),
             ];
         })->values()->all();
 
@@ -92,6 +105,12 @@ class LongListingReportService
         $this->constrainSource($unassignedCount);
         $unassignedCount = $unassignedCount->count();
         $unassignedDuplicates = count($this->duplicateGroupsForPosition(null)['duplicate_application_ids']);
+        $unassignedWithDocs = Application::query()
+            ->whereNull('position_id')
+            ->whereNull('duplicate_hidden_at')
+            ->whereHas('documents');
+        $this->constrainSource($unassignedWithDocs);
+        $unassignedWithDocs = $unassignedWithDocs->count();
 
         $unassigned = [
             'key' => 'unassigned',
@@ -102,6 +121,8 @@ class LongListingReportService
             'vacancies' => null,
             'total_applicants' => (int) $unassignedCount,
             'duplicate_applicants' => $unassignedDuplicates,
+            'with_documents' => (int) $unassignedWithDocs,
+            'without_documents' => max(0, (int) $unassignedCount - (int) $unassignedWithDocs),
         ];
 
         return [
