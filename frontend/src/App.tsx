@@ -21,7 +21,7 @@ import ScreeningPage from './pages/ScreeningPage';
 import SettingsPage from './pages/SettingsPage';
 import ShortlistingPage from './pages/ShortlistingPage';
 import UsersPage from './pages/UsersPage';
-import ProtectedRoute from './routes/ProtectedRoute';
+import ProtectedRoute, { HomeRedirect } from './routes/ProtectedRoute';
 
 export default function App() {
   return (
@@ -33,7 +33,7 @@ export default function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/applications" element={<ApplicationsPage />} />
               <Route path="/applications/:id" element={<ApplicationDetailPage />} />

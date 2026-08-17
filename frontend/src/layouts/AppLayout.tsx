@@ -2,23 +2,32 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/applications', label: 'Applications' },
-  { to: '/applicants', label: 'Applicants' },
-  { to: '/positions', label: 'Positions' },
-  { to: '/screening', label: 'Screening' },
-  { to: '/shortlisting', label: 'Shortlisting' },
-  { to: '/documents', label: 'Documents' },
-  { to: '/mailbox', label: 'Mailbox' },
-  { to: '/myjobs', label: 'MyJobs' },
-  { to: '/reports', label: 'Reports' },
-  { to: '/users', label: 'Users' },
-  { to: '/settings', label: 'Settings' },
-  { to: '/audit-logs', label: 'Audit Logs' },
+  { to: '/dashboard', label: 'Dashboard', permission: 'applications.view' },
+  { to: '/applications', label: 'Applications', permission: 'applications.view' },
+  { to: '/applicants', label: 'Applicants', permission: 'applications.view' },
+  { to: '/positions', label: 'Positions', permission: 'applications.view' },
+  { to: '/screening', label: 'Screening', permission: 'screening.view' },
+  { to: '/shortlisting', label: 'Shortlisting', permission: 'applications.shortlist' },
+  { to: '/documents', label: 'Documents', permission: 'documents.view' },
+  { to: '/mailbox', label: 'Mailbox', permission: 'mailbox.sync' },
+  { to: '/myjobs', label: 'MyJobs', permission: 'applications.view' },
+  { to: '/reports', label: 'Reports', permission: 'reports.view' },
+  { to: '/users', label: 'Users', permission: 'users.manage' },
+  { to: '/settings', label: 'Settings', permission: 'settings.view' },
+  { to: '/audit-logs', label: 'Audit Logs', permission: 'audit.view' },
 ];
+
+function canAccessNavItem(permissions: string[] | undefined, required?: string): boolean {
+  if (!required) {
+    return true;
+  }
+
+  return permissions?.includes(required) ?? false;
+}
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const visibleNavItems = navItems.filter((item) => canAccessNavItem(user?.permissions, item.permission));
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[280px_1fr]">
@@ -28,7 +37,7 @@ export default function AppLayout() {
           <p className="mt-1 text-sm text-white/80">Careers Application Management</p>
         </div>
         <nav className="space-y-1 p-4" aria-label="Primary">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

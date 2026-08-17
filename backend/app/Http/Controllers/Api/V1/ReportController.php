@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\MailAttachment;
 use App\Models\MailMessage;
+use App\Services\Access\PositionScopeService;
 use App\Services\Reports\LongListingReportService;
 use App\Support\ApiResponse;
 use App\Support\Excel\NckReportExcel;
@@ -18,8 +19,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
-    public function __construct(private readonly LongListingReportService $longListing)
-    {
+    public function __construct(
+        private readonly LongListingReportService $longListing,
+        private readonly PositionScopeService $positionScope,
+    ) {
     }
 
     public function summary(): JsonResponse
@@ -29,12 +32,15 @@ class ReportController extends Controller
         $weekStart = $now->copy()->startOfWeek()->utc();
         $monthStart = $now->copy()->startOfMonth()->utc();
 
-        $byStatus = Application::query()
+        $byStatusQuery = Application::query()
             ->select('status', DB::raw('COUNT(*) as total'))
-            ->groupBy('status')
-            ->pluck('total', 'status');
+            ->groupBy('status');
 
-        $byPosition = Application::query()
+        $this->positionScope->scopeApplicationsQuery($byStatusQuery);
+
+        $byStatus = $byStatusQuery->pluck('total', 'status');
+
+        $byPositionQuery = Application::query()
             ->leftJoin('positions', 'positions.id', '=', 'applications.position_id')
             ->select(
                 'applications.position_id',
@@ -51,8 +57,11 @@ class ReportController extends Controller
                 'positions.sort_order'
             )
             ->orderBy('positions.sort_order')
-            ->orderByDesc('total')
-            ->get()
+            ->orderByDesc('total');
+
+        $this->positionScope->scopeApplicationsQuery($byPositionQuery);
+
+        $byPosition = $byPositionQuery->get()
             ->map(fn ($row) => [
                 'position_id' => $row->position_id,
                 'title' => $row->title ?? 'Unassigned',
@@ -61,27 +70,38 @@ class ReportController extends Controller
                 'total' => (int) $row->total,
             ]);
 
-        $attachmentStats = MailAttachment::query()
-            ->select('download_status', DB::raw('COUNT(*) as total'))
-            ->groupBy('download_status')
-            ->pluck('total', 'download_status');
+        $weekQuery = Application::query()->where('received_at', '>=', $weekStart);
+        $this->positionScope->scopeApplicationsQuery($weekQuery);
 
-        return ApiResponse::success([
+        $monthQuery = Application::query()->where('received_at', '>=', $monthStart);
+        $this->positionScope->scopeApplicationsQuery($monthQuery);
+
+        $payload = [
             'counts_by_status' => $byStatus,
             'counts_by_position' => $byPosition,
             'email_duplicates' => $this->longListing->emailDuplicatesSummary(),
-            'mailbox' => [
+            'applications_this_week' => $weekQuery->count(),
+            'applications_this_month' => $monthQuery->count(),
+            'generated_at' => NairobiDate::iso($now),
+        ];
+
+        if (! $this->positionScope->isRestricted()) {
+            $attachmentStats = MailAttachment::query()
+                ->select('download_status', DB::raw('COUNT(*) as total'))
+                ->groupBy('download_status')
+                ->pluck('total', 'download_status');
+
+            $payload['mailbox'] = [
                 'messages_total' => MailMessage::query()->count(),
                 'messages_pending_application' => MailMessage::query()->where('application_created', false)->count(),
                 'attachments_by_status' => $attachmentStats,
                 'attachments_pending' => MailAttachment::query()->where('download_status', 'pending')->count(),
                 'attachments_failed' => MailAttachment::query()->where('download_status', 'failed')->count(),
                 'attachments_downloaded' => MailAttachment::query()->where('download_status', 'downloaded')->count(),
-            ],
-            'applications_this_week' => Application::query()->where('received_at', '>=', $weekStart)->count(),
-            'applications_this_month' => Application::query()->where('received_at', '>=', $monthStart)->count(),
-            'generated_at' => NairobiDate::iso($now),
-        ]);
+            ];
+        }
+
+        return ApiResponse::success($payload);
     }
 
     public function longListing(Request $request): JsonResponse

@@ -4,6 +4,7 @@ namespace App\Services\Reports;
 
 use App\Models\Application;
 use App\Models\Position;
+use App\Services\Access\PositionScopeService;
 use App\Support\NairobiDate;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\DB;
 
 class LongListingReportService
 {
+    public function __construct(private readonly PositionScopeService $positionScope)
+    {
+    }
+
     /**
      * Lightweight category index for the Reports landing list.
      *
@@ -19,11 +24,12 @@ class LongListingReportService
      */
     public function categoryIndex(bool $includeUnassigned = true): array
     {
-        $positions = Position::query()
-            ->where('reference_code', 'like', 'NCK/REC%')
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get(['id', 'uuid', 'reference_code', 'title', 'department', 'vacancies', 'sort_order']);
+        $positions = $this->positionScope->scopePositionsQuery(
+            Position::query()
+                ->where('reference_code', 'like', 'NCK/REC%')
+                ->orderBy('sort_order')
+                ->orderBy('id')
+        )->get(['id', 'uuid', 'reference_code', 'title', 'department', 'vacancies', 'sort_order']);
 
         $counts = Application::query()
             ->whereNull('duplicate_hidden_at')
@@ -66,7 +72,7 @@ class LongListingReportService
         return [
             'generated_at' => NairobiDate::iso(now()),
             'categories' => $categories,
-            'unassigned' => $includeUnassigned ? $unassigned : null,
+            'unassigned' => $includeUnassigned && ! $this->positionScope->isRestricted() ? $unassigned : null,
         ];
     }
 
@@ -84,6 +90,7 @@ class LongListingReportService
         ?string $duplicates = null,
         ?string $match = null,
     ): array {
+        $this->positionScope->assertCanAccessCategoryKey($categoryKey);
         $category = $this->resolveCategoryMeta($categoryKey);
         $positionId = $category['position_id'];
         $duplicateMeta = $this->duplicateGroupsForPosition($positionId);
@@ -139,10 +146,16 @@ class LongListingReportService
      */
     public function build(?int $positionId = null, bool $includeUnassigned = true): array
     {
-        $positionsQuery = Position::query()
-            ->where('reference_code', 'like', 'NCK/REC%')
-            ->orderBy('sort_order')
-            ->orderBy('id');
+        if ($positionId !== null) {
+            $this->positionScope->assertCanAccessPosition($positionId);
+        }
+
+        $positionsQuery = $this->positionScope->scopePositionsQuery(
+            Position::query()
+                ->where('reference_code', 'like', 'NCK/REC%')
+                ->orderBy('sort_order')
+                ->orderBy('id')
+        );
 
         if ($positionId) {
             $positionsQuery->whereKey($positionId);
@@ -157,7 +170,7 @@ class LongListingReportService
         }
 
         $unassigned = null;
-        if ($includeUnassigned && ! $positionId) {
+        if ($includeUnassigned && ! $positionId && ! $this->positionScope->isRestricted()) {
             $apps = $this->applicationsForPosition(null);
             $unassigned = [
                 'position_id' => null,
@@ -184,6 +197,7 @@ class LongListingReportService
         $includeCategory = $positionId === null && ! $unassignedOnly;
 
         if ($unassignedOnly) {
+            $this->positionScope->assertCanAccessCategoryKey('unassigned');
             $apps = $this->applicationsForPosition(null);
             $out = [];
             foreach ($apps->values() as $index => $app) {
@@ -193,7 +207,14 @@ class LongListingReportService
             return $out;
         }
 
-        $report = $this->build($positionId, $includeUnassigned && $positionId === null);
+        if ($positionId !== null) {
+            $this->positionScope->assertCanAccessPosition($positionId);
+        }
+
+        $report = $this->build(
+            $positionId,
+            $includeUnassigned && $positionId === null && ! $this->positionScope->isRestricted(),
+        );
         $out = [];
 
         foreach ($report['categories'] as $category) {
@@ -223,6 +244,7 @@ class LongListingReportService
         ?string $duplicates = null,
         ?string $match = null,
     ): array {
+        $this->positionScope->assertCanAccessCategoryKey($categoryKey);
         $category = $this->resolveCategoryMeta($categoryKey);
         $duplicateMeta = $this->duplicateGroupsForPosition($category['position_id']);
         $query = $this->baseQuery($category['position_id']);
@@ -563,6 +585,10 @@ class LongListingReportService
      */
     public function hiddenDuplicatesReport(?int $positionId = null): array
     {
+        if ($positionId !== null) {
+            $this->positionScope->assertCanAccessPosition($positionId);
+        }
+
         $query = Application::query()
             ->with([
                 'applicant:id,full_name,email,phone,national_id',
@@ -573,6 +599,8 @@ class LongListingReportService
             ->whereNotNull('duplicate_hidden_at')
             ->orderByDesc('duplicate_hidden_at')
             ->orderBy('id');
+
+        $this->positionScope->scopeApplicationsQuery($query);
 
         if ($positionId !== null) {
             $query->where('position_id', $positionId);
@@ -650,6 +678,13 @@ class LongListingReportService
                 continue;
             }
 
+            $allowed = $this->positionScope->allowedPositionIds();
+            if ($allowed !== null) {
+                if ($row->position_id === null || ! in_array((int) $row->position_id, $allowed, true)) {
+                    continue;
+                }
+            }
+
             $groups++;
             $extras = max(0, (int) $row->total - 1);
             $total += $extras;
@@ -703,6 +738,10 @@ class LongListingReportService
      */
     public function emailDuplicatesReport(?int $positionId = null): array
     {
+        if ($positionId !== null) {
+            $this->positionScope->assertCanAccessPosition($positionId);
+        }
+
         $query = Application::query()
             ->with([
                 'applicant:id,full_name,email,phone,national_id',
@@ -714,6 +753,8 @@ class LongListingReportService
             })
             ->orderBy('received_at')
             ->orderBy('id');
+
+        $this->positionScope->scopeApplicationsQuery($query);
 
         if ($positionId !== null) {
             $query->where('position_id', $positionId);

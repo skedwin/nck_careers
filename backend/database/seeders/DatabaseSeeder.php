@@ -59,6 +59,9 @@ class DatabaseSeeder extends Seeder
             'Read Only' => [
                 'applications.view', 'documents.view', 'screening.view', 'reports.view', 'settings.view',
             ],
+            'Report Viewer' => [
+                'reports.view',
+            ],
             'Auditor' => [
                 'applications.view', 'documents.view', 'audit.view', 'reports.view', 'settings.view',
             ],
