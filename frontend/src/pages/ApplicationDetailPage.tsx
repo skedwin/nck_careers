@@ -302,6 +302,11 @@ export default function ApplicationDetailPage() {
           </p>
           <h2 className="font-display text-3xl font-semibold text-nck-slate">{app.application_reference}</h2>
           <p className="mt-1 text-sm text-slate-600">{app.subject ?? 'No subject'}</p>
+          {app.source === 'myjobs' && (
+            <p className="mt-2 inline-flex rounded-full bg-nck-greenLight px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-nck-green">
+              MyJobs application
+            </p>
+          )}
         </div>
         <div className="text-right text-sm">
           <p className="font-semibold text-nck-slate">{humanize(app.status)}</p>
@@ -909,7 +914,12 @@ export default function ApplicationDetailPage() {
           <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
             {[
               ['Nature of application', formatNature(app.profile)],
-              ['Highest qualification', formatQualification(app.profile)],
+              [
+                'Highest qualification',
+                [formatQualification(app.profile), app.profile?.highest_qualification_detail]
+                  .filter((part) => part && String(part).trim() !== '')
+                  .join(' — '),
+              ],
               ['Professional qualifications', app.profile?.professional_qualifications],
               ['Management course', formatYesNoCourse(app.profile?.management_course) || null],
               ['Leadership course', formatYesNoCourse(app.profile?.leadership_course) || null],
@@ -934,6 +944,16 @@ export default function ApplicationDetailPage() {
               ],
               ['County', app.applicant?.county],
               ['Gender', app.applicant?.gender],
+              ...(app.profile?.myjobs
+                ? ([
+                    ['MyJobs current role', app.profile.myjobs.current_position],
+                    ['MyJobs employer', app.profile.myjobs.company],
+                    ['MyJobs age', app.profile.myjobs.age],
+                    ['Expected salary', app.profile.myjobs.expected_salary],
+                    ['Current salary', app.profile.myjobs.current_salary],
+                    ['MyJobs score', app.profile.myjobs.score],
+                  ] as Array<[string, string | number | null | undefined]>)
+                : []),
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-xl bg-nck-mist/50 px-3 py-2">
                 <dt className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</dt>
@@ -956,6 +976,18 @@ export default function ApplicationDetailPage() {
         ) : (
           <p className="mt-3 text-xs text-slate-500">
             Not extracted yet — background extract is running, or use Edit profile.
+          </p>
+        )}
+        {app.profile?.myjobs?.scores_link && (
+          <p className="mt-2 text-xs">
+            <a
+              className="font-semibold text-nck-green hover:underline"
+              href={app.profile.myjobs.scores_link}
+              target="_blank"
+              rel="noreferrer"
+            >
+              MyJobs scores link
+            </a>
           </p>
         )}
         {(app.profile?.document_sources?.length ?? 0) > 0 && (

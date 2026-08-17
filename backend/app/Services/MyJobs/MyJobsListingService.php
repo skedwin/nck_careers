@@ -4,7 +4,9 @@ namespace App\Services\MyJobs;
 
 use App\Models\Applicant;
 use App\Models\Application;
+use App\Models\Position;
 use App\Support\NairobiDate;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class MyJobsListingService
@@ -151,6 +153,25 @@ class MyJobsListingService
         });
     }
 
+    public function forgetCache(): void
+    {
+        Cache::forget('myjobs.listing.'.$this->directoryStamp($this->directory()));
+    }
+
+    public function normalizeNamePublic(string $name): string
+    {
+        return $this->normalizeName($name);
+    }
+
+    /**
+     * @param  Collection<string, Position>|null  $positions
+     * @return array{id: int|null, code: string|null, title: string|null}
+     */
+    public function mapFileToPositionPublic(string $file, ?Collection $positions = null): array
+    {
+        return $this->mapFileToPosition($file, $positions);
+    }
+
     /**
      * @param  list<array<string, mixed>>  $rows
      * @return list<array<string, mixed>>
@@ -191,6 +212,10 @@ class MyJobsListingService
         $index = $this->applicantIndex();
         $files = glob($dir.DIRECTORY_SEPARATOR.'*.xlsx') ?: [];
         sort($files);
+        $positions = Position::query()
+            ->where('reference_code', 'like', 'NCK/REC%')
+            ->get(['id', 'reference_code', 'title'])
+            ->keyBy(fn (Position $position) => strtoupper((string) $position->reference_code));
 
         $rows = [];
         $serial = 0;
@@ -199,7 +224,7 @@ class MyJobsListingService
             if (str_starts_with($file, '~$')) {
                 continue;
             }
-            $mapped = $this->mapFileToPosition($file);
+            $mapped = $this->mapFileToPosition($file, $positions);
             foreach ($this->reader->rows($path) as $raw) {
                 $name = trim((string) ($raw['name'] ?? ''));
                 $email = strtolower(trim((string) ($raw['email'] ?? '')));
@@ -232,6 +257,8 @@ class MyJobsListingService
                     'gender' => $this->nullable($raw['gender'] ?? null),
                     'education' => $this->nullable($raw['education'] ?? null),
                     'position' => $this->nullable($raw['position'] ?? null),
+                    'company' => $this->nullable($raw['company'] ?? null),
+                    'age' => $this->nullable($raw['age'] ?? null),
                     'applied_at' => $this->nullable($raw['application_date'] ?? null),
                     'score' => $this->nullable($raw['score'] ?? $raw['score_'] ?? null),
                     'mapped_position_id' => $mapped['id'],
@@ -436,28 +463,45 @@ class MyJobsListingService
     }
 
     /**
+     * @param  Collection<string, Position>|null  $positions
      * @return array{id: int|null, code: string|null, title: string|null}
      */
-    private function mapFileToPosition(string $file): array
+    private function mapFileToPosition(string $file, ?Collection $positions = null): array
     {
         $map = [
-            'corporate communications officer.xlsx' => ['id' => 10, 'code' => 'NCK/REC7', 'title' => 'Corporate Communication Officer'],
-            'corporation secretary & director legal services.xlsx' => ['id' => 5, 'code' => 'NCK/REC2', 'title' => 'Corporate Secretary & Director Legal Services'],
-            'customer care assistant.xlsx' => ['id' => 14, 'code' => 'NCK/REC11', 'title' => 'Customer Care Assistant/Senior'],
-            'deputy director human resources.xlsx' => ['id' => 8, 'code' => 'NCK/REC5', 'title' => 'Deputy Director, Human Resources and Administration'],
-            'deputy director researchstrategy, planning &performance mgt.xlsx' => ['id' => 7, 'code' => 'NCK/REC4', 'title' => 'Deputy Director, Research, Strategy, Planning & Performance Management'],
-            'director registration & licensing.xlsx' => ['id' => 4, 'code' => 'NCK/REC1', 'title' => 'Director Registration and Licensing'],
-            'director corporate services.xlsx' => ['id' => 6, 'code' => 'NCK/REC3', 'title' => 'Director Corporate Services'],
-            'education & examination officer.xlsx' => ['id' => 12, 'code' => 'NCK/REC9', 'title' => 'Education and Examination Officer'],
-            'office administrators.xlsx' => ['id' => 15, 'code' => 'NCK/REC12', 'title' => 'Office Administrator'],
-            'office assistants.xlsx' => ['id' => 16, 'code' => 'NCK/REC13', 'title' => 'Office Assistant'],
-            'registration & licensing officer.xlsx' => ['id' => 11, 'code' => 'NCK/REC8', 'title' => 'Registration and Licensing Officer'],
-            'senior corporate communications officer.xlsx' => ['id' => 9, 'code' => 'NCK/REC6', 'title' => 'Senior Corporate Communication Officer'],
-            'senior customer care assistant.xlsx' => ['id' => 14, 'code' => 'NCK/REC11', 'title' => 'Customer Care Assistant/Senior'],
-            'standards & compliance officer.xlsx' => ['id' => 13, 'code' => 'NCK/REC10', 'title' => 'Standards and Compliance Officer'],
+            'corporate communications officer.xlsx' => 'NCK/REC7',
+            'corporation secretary & director legal services.xlsx' => 'NCK/REC2',
+            'customer care assistant.xlsx' => 'NCK/REC11',
+            'deputy director human resources.xlsx' => 'NCK/REC5',
+            'deputy director researchstrategy, planning &performance mgt.xlsx' => 'NCK/REC4',
+            'director registration & licensing.xlsx' => 'NCK/REC1',
+            'director corporate services.xlsx' => 'NCK/REC3',
+            'education & examination officer.xlsx' => 'NCK/REC9',
+            'office administrators.xlsx' => 'NCK/REC12',
+            'office assistants.xlsx' => 'NCK/REC13',
+            'registration & licensing officer.xlsx' => 'NCK/REC8',
+            'senior corporate communications officer.xlsx' => 'NCK/REC6',
+            'senior customer care assistant.xlsx' => 'NCK/REC11',
+            'standards & compliance officer.xlsx' => 'NCK/REC10',
         ];
 
-        return $map[strtolower($file)] ?? ['id' => null, 'code' => null, 'title' => null];
+        $code = $map[strtolower($file)] ?? null;
+        if ($code === null) {
+            return ['id' => null, 'code' => null, 'title' => null];
+        }
+
+        $positions ??= Position::query()
+            ->where('reference_code', 'like', 'NCK/REC%')
+            ->get(['id', 'reference_code', 'title'])
+            ->keyBy(fn (Position $position) => strtoupper((string) $position->reference_code));
+
+        $position = $positions->get($code);
+
+        return [
+            'id' => $position?->id,
+            'code' => $code,
+            'title' => $position?->title,
+        ];
     }
 
     private function directoryStamp(string $dir): string

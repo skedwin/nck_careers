@@ -269,6 +269,18 @@ export type ApplicationProfile = {
   sources?: string[];
   documents_scanned?: number;
   document_sources?: Array<{ name: string; path?: string; chars?: number; type?: string }>;
+  myjobs?: {
+    file?: string | null;
+    current_position?: string | null;
+    company?: string | null;
+    age?: string | null;
+    age_years?: number | null;
+    expected_salary?: string | null;
+    current_salary?: string | null;
+    score?: string | null;
+    scores_link?: string | null;
+    applied_at?: string | null;
+  } | null;
 };
 
 export type ApplicationDuplicateRelated = {
@@ -384,6 +396,7 @@ export type ReportSummary = {
   };
   applications_this_week?: number;
   applications_this_month?: number;
+  myjobs_total?: number;
   generated_at?: string | null;
   mailbox?: {
     messages_total?: number;
@@ -464,6 +477,7 @@ export type LongListingCategorySummary = {
 
 export type LongListingIndex = {
   generated_at?: string | null;
+  source?: 'mailbox' | 'myjobs' | string;
   categories: LongListingCategorySummary[];
   unassigned?: LongListingCategorySummary | null;
 };
@@ -482,6 +496,7 @@ export type LongListingCategoryPageData = {
     qualification?: string | null;
     duplicates?: string | null;
     match?: string | null;
+    source?: string | null;
   };
   generated_at?: string | null;
 };
@@ -515,7 +530,10 @@ export type MyJobsRow = {
   gender?: string | null;
   education?: string | null;
   position?: string | null;
+  company?: string | null;
+  age?: string | null;
   applied_at?: string | null;
+  score?: string | null;
   mapped_position_id?: number | null;
   mapped_position_code?: string | null;
   mapped_position_title?: string | null;

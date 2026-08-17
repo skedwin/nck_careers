@@ -13,8 +13,40 @@ use Illuminate\Support\Facades\DB;
 
 class LongListingReportService
 {
+    public const SOURCE_MAILBOX = 'mailbox';
+
+    public const SOURCE_MYJOBS = 'myjobs';
+
+    private string $listingSource = self::SOURCE_MAILBOX;
+
     public function __construct(private readonly PositionScopeService $positionScope)
     {
+    }
+
+    public function usingSource(?string $source): self
+    {
+        $this->listingSource = $source === self::SOURCE_MYJOBS
+            ? self::SOURCE_MYJOBS
+            : self::SOURCE_MAILBOX;
+
+        return $this;
+    }
+
+    public function listingSource(): string
+    {
+        return $this->listingSource;
+    }
+
+    private function constrainSource(Builder $query, bool $joined = false): void
+    {
+        $column = $joined ? 'applications.source' : 'source';
+        if ($this->listingSource === self::SOURCE_MYJOBS) {
+            $query->myJobs($column);
+
+            return;
+        }
+
+        $query->notMyJobs($column);
     }
 
     /**
@@ -32,7 +64,9 @@ class LongListingReportService
         )->get(['id', 'uuid', 'reference_code', 'title', 'department', 'vacancies', 'sort_order']);
 
         $counts = Application::query()
-            ->whereNull('duplicate_hidden_at')
+            ->whereNull('duplicate_hidden_at');
+        $this->constrainSource($counts);
+        $counts = $counts
             ->selectRaw('position_id, COUNT(*) as total')
             ->groupBy('position_id')
             ->pluck('total', 'position_id');
@@ -54,8 +88,9 @@ class LongListingReportService
 
         $unassignedCount = Application::query()
             ->whereNull('position_id')
-            ->whereNull('duplicate_hidden_at')
-            ->count();
+            ->whereNull('duplicate_hidden_at');
+        $this->constrainSource($unassignedCount);
+        $unassignedCount = $unassignedCount->count();
         $unassignedDuplicates = count($this->duplicateGroupsForPosition(null)['duplicate_application_ids']);
 
         $unassigned = [
@@ -71,6 +106,7 @@ class LongListingReportService
 
         return [
             'generated_at' => NairobiDate::iso(now()),
+            'source' => $this->listingSource,
             'categories' => $categories,
             'unassigned' => $includeUnassigned && ! $this->positionScope->isRestricted() ? $unassigned : null,
         ];
@@ -134,6 +170,7 @@ class LongListingReportService
                 'qualification' => $qualification,
                 'duplicates' => $duplicates,
                 'match' => $match,
+                'source' => $this->listingSource,
             ],
             'generated_at' => NairobiDate::iso(now()),
         ];
@@ -336,7 +373,7 @@ class LongListingReportService
 
     private function baseQuery(?int $positionId): Builder
     {
-        return Application::query()
+        $query = Application::query()
             ->with(['applicant', 'documents'])
             ->whereNull('duplicate_hidden_at')
             ->when(
@@ -344,6 +381,9 @@ class LongListingReportService
                 fn (Builder $q) => $q->whereNull('position_id'),
                 fn (Builder $q) => $q->where('position_id', $positionId)
             );
+        $this->constrainSource($query);
+
+        return $query;
     }
 
     private function applySearch(Builder $query, ?string $search): void
@@ -601,6 +641,7 @@ class LongListingReportService
             ->orderBy('id');
 
         $this->positionScope->scopeApplicationsQuery($query);
+        $this->constrainSource($query);
 
         if ($positionId !== null) {
             $query->where('position_id', $positionId);
@@ -643,12 +684,14 @@ class LongListingReportService
      */
     public function emailDuplicatesSummary(): array
     {
-        $grouped = Application::query()
+        $groupedQuery = Application::query()
             ->join('applicants', 'applicants.id', '=', 'applications.applicant_id')
             ->leftJoin('positions', 'positions.id', '=', 'applications.position_id')
             ->whereNull('applications.duplicate_hidden_at')
             ->whereNotNull('applicants.email')
-            ->where('applicants.email', '!=', '')
+            ->where('applicants.email', '!=', '');
+        $this->constrainSource($groupedQuery, true);
+        $grouped = $groupedQuery
             ->select([
                 'applications.position_id',
                 'positions.reference_code',
@@ -755,6 +798,7 @@ class LongListingReportService
             ->orderBy('id');
 
         $this->positionScope->scopeApplicationsQuery($query);
+        $this->constrainSource($query);
 
         if ($positionId !== null) {
             $query->where('position_id', $positionId);
@@ -893,7 +937,9 @@ class LongListingReportService
                 fn (Builder $q) => $q->whereNull('applications.position_id'),
                 fn (Builder $q) => $q->where('applications.position_id', $positionId)
             )
-            ->when(! $includeHidden, fn (Builder $q) => $q->whereNull('applications.duplicate_hidden_at'))
+            ->when(! $includeHidden, fn (Builder $q) => $q->whereNull('applications.duplicate_hidden_at'));
+        $this->constrainSource($rows, true);
+        $rows = $rows
             ->orderBy('applications.received_at')
             ->orderBy('applications.id')
             ->get([
@@ -1240,6 +1286,11 @@ class LongListingReportService
             : $application->documents()->count();
 
         if ($docs <= 0) {
+            if (strcasecmp((string) $application->source, 'myjobs') === 0
+                || strcasecmp((string) $application->nature_of_application, 'one') === 0) {
+                return 'Yes';
+            }
+
             return null; // shown as — in UI / blank in CSV
         }
 

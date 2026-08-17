@@ -23,6 +23,13 @@ const STATUSES = [
   'rejected',
 ];
 
+const SOURCES = [
+  { value: '', label: 'All sources' },
+  { value: 'email', label: 'Email' },
+  { value: 'myjobs', label: 'MyJobs applications' },
+  { value: 'careerjet', label: 'Careerjet' },
+];
+
 export default function ApplicationsPage() {
   const { user } = useAuth();
   const canConvert = user?.permissions?.includes('applications.create') ?? false;
@@ -31,10 +38,11 @@ export default function ApplicationsPage() {
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [source, setSource] = useState('');
 
   const queryKey = useMemo(
-    () => ['applications', page, search, status] as const,
-    [page, search, status],
+    () => ['applications', page, search, status, source] as const,
+    [page, search, status, source],
   );
 
   const listQuery = useQuery({
@@ -45,6 +53,7 @@ export default function ApplicationsPage() {
           page,
           q: search || undefined,
           status: status || undefined,
+          source: source || undefined,
         },
       });
       return response.data.data;
@@ -73,7 +82,7 @@ export default function ApplicationsPage() {
         <div>
           <h2 className="font-display text-3xl font-semibold text-nck-slate">Applications</h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Review applications converted from the careers mailbox and update their status.
+            Review mailbox and MyJobs applications. Use the source filter to show MyJobs applications only.
           </p>
         </div>
         {canConvert && (
@@ -124,6 +133,20 @@ export default function ApplicationsPage() {
             </option>
           ))}
         </select>
+        <select
+          value={source}
+          onChange={(event) => {
+            setPage(1);
+            setSource(event.target.value);
+          }}
+          className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+        >
+          {SOURCES.map((option) => (
+            <option key={option.value || 'all'} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {convertMutation.isSuccess && (
@@ -150,6 +173,7 @@ export default function ApplicationsPage() {
               <th className="px-2 py-2">Reference</th>
               <th className="px-2 py-2">Applicant</th>
               <th className="px-2 py-2">Position</th>
+              <th className="px-2 py-2">Source</th>
               <th className="px-2 py-2">Status</th>
               <th className="px-2 py-2">Screening</th>
               <th className="px-2 py-2">Received</th>
@@ -158,15 +182,16 @@ export default function ApplicationsPage() {
           <tbody>
             {listQuery.isLoading && (
               <tr>
-                <td className="px-2 py-4 text-slate-500" colSpan={6}>
+                <td className="px-2 py-4 text-slate-500" colSpan={7}>
                   Loading applications…
                 </td>
               </tr>
             )}
             {!listQuery.isLoading && items.length === 0 && (
               <tr>
-                <td className="px-2 py-4 text-slate-500" colSpan={6}>
-                  No applications found. Use Convert from mailbox after syncing mail.
+                <td className="px-2 py-4 text-slate-500" colSpan={7}>
+                  No applications found. Use Convert from mailbox after syncing mail, or import MyJobs
+                  applications.
                 </td>
               </tr>
             )}
@@ -182,6 +207,13 @@ export default function ApplicationsPage() {
                   <div className="text-xs text-slate-500">{item.applicant?.email ?? ''}</div>
                 </td>
                 <td className="px-2 py-2">{item.position?.title ?? '—'}</td>
+                <td className="px-2 py-2">
+                  {item.source === 'myjobs'
+                    ? 'MyJobs'
+                    : item.source
+                      ? humanize(item.source)
+                      : '—'}
+                </td>
                 <td className="px-2 py-2">{humanize(item.status)}</td>
                 <td className="px-2 py-2">{humanize(item.screening_status)}</td>
                 <td className="px-2 py-2 whitespace-nowrap">{formatEAT(item.received_at)}</td>

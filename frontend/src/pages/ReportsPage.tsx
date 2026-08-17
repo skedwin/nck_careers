@@ -20,6 +20,91 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
   );
 }
 
+function listingCategories(report?: LongListingIndex | null): LongListingCategorySummary[] {
+  if (!report) return [];
+  const list = [...report.categories];
+  if (report.unassigned) {
+    list.push(report.unassigned);
+  }
+  return list;
+}
+
+function LongListingTable({
+  categories,
+  source,
+}: {
+  categories: LongListingCategorySummary[];
+  source?: 'mailbox' | 'myjobs';
+}) {
+  const sourceQs = source === 'myjobs' ? '?source=myjobs' : '';
+  const sourcePathQs = source === 'myjobs' ? '&source=myjobs' : '';
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-nck-green/10 bg-white shadow-sm">
+      <table className="min-w-full text-left text-sm">
+        <thead className="border-b border-slate-200 bg-nck-mist/60 text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="px-4 py-3">Code</th>
+            <th className="px-4 py-3">Category / Position</th>
+            <th className="px-4 py-3">Vacancies</th>
+            <th className="px-4 py-3 text-right">Applicants</th>
+            <th className="px-4 py-3 text-right">Duplicates</th>
+            <th className="px-4 py-3" />
+          </tr>
+        </thead>
+        <tbody>
+          {categories.length === 0 && (
+            <tr>
+              <td className="px-4 py-4 text-slate-500" colSpan={6}>
+                No categories found.
+              </td>
+            </tr>
+          )}
+          {categories.map((category) => {
+            const key = category.key || (category.position_id != null ? String(category.position_id) : 'unassigned');
+            const duplicates = category.duplicate_applicants ?? 0;
+            return (
+              <tr key={`${source ?? 'mailbox'}-${key}`} className="border-b border-slate-100 hover:bg-nck-mist/40">
+                <td className="px-4 py-3 font-semibold text-nck-green">
+                  {category.reference_code ?? 'UNASSIGNED'}
+                </td>
+                <td className="px-4 py-3 font-medium text-nck-slate">{category.title}</td>
+                <td className="px-4 py-3 tabular-nums text-slate-600">
+                  {category.vacancies != null ? category.vacancies : '—'}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums font-semibold text-nck-green">
+                  {category.total_applicants.toLocaleString()}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {duplicates > 0 ? (
+                    <Link
+                      to={`/reports/long-listing/${encodeURIComponent(key)}?duplicates=duplicates${sourcePathQs}`}
+                      className="font-semibold text-amber-800 hover:underline"
+                      title="Open duplicates only"
+                    >
+                      {duplicates.toLocaleString()}
+                    </Link>
+                  ) : (
+                    <span className="text-slate-500">0</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    to={`/reports/long-listing/${encodeURIComponent(key)}${sourceQs}`}
+                    className="inline-flex rounded-xl border border-nck-green/20 px-3 py-1.5 text-sm font-semibold text-nck-green hover:bg-nck-greenLight"
+                  >
+                    Open
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -42,24 +127,32 @@ export default function ReportsPage() {
     },
   });
 
-  const categories = useMemo(() => {
-    const report = longListingQuery.data;
-    if (!report) return [] as LongListingCategorySummary[];
-    const list = [...report.categories];
-    if (report.unassigned) {
-      list.push(report.unassigned);
-    }
-    return list;
-  }, [longListingQuery.data]);
+  const myJobsListingQuery = useQuery({
+    queryKey: ['reports-long-listing-myjobs'],
+    queryFn: async () => {
+      const response = await api.get<ApiSuccess<LongListingIndex>>('/reports/long-listing', {
+        params: { source: 'myjobs' },
+      });
+      return response.data.data;
+    },
+  });
 
-  const exportAll = async () => {
+  const categories = useMemo(() => listingCategories(longListingQuery.data), [longListingQuery.data]);
+  const myJobsCategories = useMemo(
+    () => listingCategories(myJobsListingQuery.data),
+    [myJobsListingQuery.data],
+  );
+
+  const exportAll = async (source?: 'myjobs') => {
     setExporting(true);
     setExportError(null);
     try {
-      await downloadAuthorized(
-        '/reports/long-listing/export?include_unassigned=1',
-        `nck_long_listing_all_${Date.now()}.xls`,
-      );
+      const qs = source === 'myjobs' ? 'source=myjobs' : 'include_unassigned=1';
+      const filename =
+        source === 'myjobs'
+          ? `nck_myjobs_long_listing_all_${Date.now()}.xls`
+          : `nck_long_listing_all_${Date.now()}.xls`;
+      await downloadAuthorized(`/reports/long-listing/export?${qs}`, filename);
     } catch (error) {
       setExportError(getApiError(error, 'Excel export failed.'));
     } finally {
@@ -89,7 +182,7 @@ export default function ReportsPage() {
         <div>
           <h2 className="font-display text-3xl font-semibold text-nck-slate">Reports</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Summary and long listing by application category as of {formatEAT(data.generated_at)}.
+            Mailbox long listing is separate from MyJobs applications. As of {formatEAT(data.generated_at)}.
           </p>
         </div>
         <button
@@ -111,7 +204,7 @@ export default function ReportsPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="This week" value={data.applications_this_week ?? 0} />
         <StatCard label="This month" value={data.applications_this_month ?? 0} />
-        <StatCard label="Mail messages" value={data.mailbox?.messages_total ?? 0} />
+        <StatCard label="MyJobs applications" value={data.myjobs_total ?? 0} />
         <StatCard label="Pending mail apps" value={data.mailbox?.messages_pending_application ?? 0} />
       </div>
 
@@ -209,16 +302,25 @@ export default function ReportsPage() {
           <div>
             <h3 className="font-display text-2xl font-semibold text-nck-slate">Long listing</h3>
             <p className="mt-1 text-sm text-slate-600">
-              Open a category to view applicants with search and pagination. Generated{' '}
-              {formatEAT(listing?.generated_at)}.
+              Mailbox / email applications only. Generated {formatEAT(listing?.generated_at)}.
             </p>
           </div>
-          <Link
-            to="/reports/hidden-duplicates"
-            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
-          >
-            Hidden duplicates report
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/reports/hidden-duplicates"
+              className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+            >
+              Hidden duplicates report
+            </Link>
+            <button
+              type="button"
+              disabled={exporting}
+              onClick={() => void exportAll()}
+              className="rounded-xl bg-nck-green px-4 py-2 text-sm font-semibold text-white hover:bg-nck-greenDark disabled:opacity-60"
+            >
+              {exporting ? 'Exporting…' : 'Export mailbox Excel'}
+            </button>
+          </div>
         </div>
 
         {longListingQuery.isError && (
@@ -227,68 +329,35 @@ export default function ReportsPage() {
           </div>
         )}
 
-        <div className="overflow-x-auto rounded-2xl border border-nck-green/10 bg-white shadow-sm">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-nck-mist/60 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Code</th>
-                <th className="px-4 py-3">Category / Position</th>
-                <th className="px-4 py-3">Vacancies</th>
-                <th className="px-4 py-3 text-right">Applicants</th>
-                <th className="px-4 py-3 text-right">Duplicates</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {categories.length === 0 && (
-                <tr>
-                  <td className="px-4 py-4 text-slate-500" colSpan={6}>
-                    No categories found.
-                  </td>
-                </tr>
-              )}
-              {categories.map((category) => {
-                const key = category.key || (category.position_id != null ? String(category.position_id) : 'unassigned');
-                const duplicates = category.duplicate_applicants ?? 0;
-                return (
-                  <tr key={key} className="border-b border-slate-100 hover:bg-nck-mist/40">
-                    <td className="px-4 py-3 font-semibold text-nck-green">
-                      {category.reference_code ?? 'UNASSIGNED'}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-nck-slate">{category.title}</td>
-                    <td className="px-4 py-3 tabular-nums text-slate-600">
-                      {category.vacancies != null ? category.vacancies : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-nck-green">
-                      {category.total_applicants.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {duplicates > 0 ? (
-                        <Link
-                          to={`/reports/long-listing/${encodeURIComponent(key)}?duplicates=duplicates`}
-                          className="font-semibold text-amber-800 hover:underline"
-                          title="Open duplicates only"
-                        >
-                          {duplicates.toLocaleString()}
-                        </Link>
-                      ) : (
-                        <span className="text-slate-500">0</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        to={`/reports/long-listing/${encodeURIComponent(key)}`}
-                        className="inline-flex rounded-xl border border-nck-green/20 px-3 py-1.5 text-sm font-semibold text-nck-green hover:bg-nck-greenLight"
-                      >
-                        Open
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <LongListingTable categories={categories} />
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="font-display text-2xl font-semibold text-nck-slate">MyJobs long listing</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Applications imported from My Jobs In Kenya spreadsheets. Generated{' '}
+              {formatEAT(myJobsListingQuery.data?.generated_at)}.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={() => void exportAll('myjobs')}
+            className="rounded-xl border border-nck-green/20 bg-nck-greenLight px-4 py-2 text-sm font-semibold text-nck-green disabled:opacity-60"
+          >
+            {exporting ? 'Exporting…' : 'Export MyJobs Excel'}
+          </button>
         </div>
+
+        {myJobsListingQuery.isError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+            {getApiError(myJobsListingQuery.error, 'Unable to load MyJobs long listing.')}
+          </div>
+        )}
+
+        <LongListingTable categories={myJobsCategories} source="myjobs" />
       </section>
     </div>
   );

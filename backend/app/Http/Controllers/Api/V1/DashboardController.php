@@ -32,11 +32,13 @@ class DashboardController extends Controller
         $syncState = MailSyncState::query()->orderByDesc('id')->first();
 
         $byStatus = Application::query()
+            ->notMyJobs()
             ->select('status', DB::raw('COUNT(*) as total'))
             ->groupBy('status')
             ->pluck('total', 'status');
 
         $byPosition = Application::query()
+            ->notMyJobs('applications.source')
             ->leftJoin('positions', 'positions.id', '=', 'applications.position_id')
             ->select(
                 'applications.position_id',
@@ -57,16 +59,16 @@ class DashboardController extends Controller
         $lastSuccessfulSync = $syncState?->last_successful_sync_at;
 
         return ApiResponse::success([
-            'total_applications' => Application::query()->count(),
-            'applications_today' => Application::query()->where('received_at', '>=', $todayStart)->count(),
-            'applications_this_week' => Application::query()->where('received_at', '>=', $weekStart)->count(),
-            'applications_this_month' => Application::query()->where('received_at', '>=', $monthStart)->count(),
+            'total_applications' => Application::query()->notMyJobs()->count(),
+            'applications_today' => Application::query()->notMyJobs()->where('received_at', '>=', $todayStart)->count(),
+            'applications_this_week' => Application::query()->notMyJobs()->where('received_at', '>=', $weekStart)->count(),
+            'applications_this_month' => Application::query()->notMyJobs()->where('received_at', '>=', $monthStart)->count(),
             'eligible' => (int) ($byStatus[Application::STATUS_ELIGIBLE] ?? 0),
             'not_eligible' => (int) ($byStatus[Application::STATUS_NOT_ELIGIBLE] ?? 0),
             'needs_review' => (int) ($byStatus[Application::STATUS_NEEDS_REVIEW] ?? 0)
-                + Application::query()->where('screening_status', 'needs_review')->count(),
+                + Application::query()->notMyJobs()->where('screening_status', 'needs_review')->count(),
             'shortlisted' => (int) ($byStatus[Application::STATUS_SHORTLISTED] ?? 0),
-            'pending_ai_processing' => Application::query()->where('screening_status', 'pending')->count(),
+            'pending_ai_processing' => Application::query()->notMyJobs()->where('screening_status', 'pending')->count(),
             'failed_document_processing' => MailAttachment::query()->where('download_status', 'failed')->count(),
             'mail_messages_total' => MailMessage::query()->count(),
             'mail_attachments_pending' => MailAttachment::query()->where('download_status', 'pending')->count(),

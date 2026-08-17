@@ -123,6 +123,8 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('permission:applications.view|reports.view');
         Route::get('/myjobs/export', [MyJobsController::class, 'export'])
             ->middleware('permission:applications.view|reports.view');
+        Route::post('/myjobs/import', [MyJobsController::class, 'import'])
+            ->middleware(['permission:applications.create|applications.update', 'throttle:5,1']);
 
         Route::get('/reports/summary', [ReportController::class, 'summary'])
             ->middleware('permission:reports.view');

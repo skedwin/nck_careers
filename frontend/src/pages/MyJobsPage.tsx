@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api, { getApiError, type ApiSuccess, type MyJobsListing } from '../lib/api';
 import { formatEAT } from '../lib/dates';
 import { downloadAuthorized } from '../lib/download';
+import { useAuth } from '../context/AuthContext';
 
 const EXISTENCE_FILTERS = [
   { value: '', label: 'All MyJobs applicants' },
@@ -34,6 +35,11 @@ function matchLabel(match: string): string {
 }
 
 export default function MyJobsPage() {
+  const { user } = useAuth();
+  const canImport =
+    (user?.permissions?.includes('applications.create') ?? false) ||
+    (user?.permissions?.includes('applications.update') ?? false);
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
@@ -80,6 +86,20 @@ export default function MyJobsPage() {
     }
   };
 
+  const importMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post<
+        ApiSuccess<{ created: number; enriched: number; skipped: number; failed: number; dry_run: boolean }>
+      >('/myjobs/import');
+      return response.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['myjobs'] });
+      void queryClient.invalidateQueries({ queryKey: ['applications'] });
+      void queryClient.invalidateQueries({ queryKey: ['reports-long-listing'] });
+    },
+  });
+
   const data = listQuery.data;
   const rows = data?.rows ?? [];
   const meta = data?.meta;
@@ -91,19 +111,31 @@ export default function MyJobsPage() {
         <div>
           <h2 className="font-display text-3xl font-semibold text-nck-slate">MyJobs</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Applicants submitted through My Jobs In Kenya. Existence is checked by email and by name
-            against applications already in this system.
+            Applicants submitted through My Jobs In Kenya. Import creates MyJobs applications and fills
+            profiles from the spreadsheet (education, gender, phone, current job, salary, age, score).
             {data?.generated_at ? ` As of ${formatEAT(data.generated_at)}.` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          disabled={exporting || !data}
-          onClick={() => void exportCsv()}
-          className="rounded-xl bg-nck-green px-4 py-2.5 text-sm font-semibold text-white hover:bg-nck-greenDark disabled:opacity-60"
-        >
-          {exporting ? 'Exporting…' : 'Export Excel'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {canImport && (
+            <button
+              type="button"
+              disabled={importMutation.isPending}
+              onClick={() => importMutation.mutate()}
+              className="rounded-xl border border-nck-green/20 bg-nck-greenLight px-4 py-2.5 text-sm font-semibold text-nck-green disabled:opacity-60"
+            >
+              {importMutation.isPending ? 'Importing…' : 'Import as applications'}
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={exporting || !data}
+            onClick={() => void exportCsv()}
+            className="rounded-xl bg-nck-green px-4 py-2.5 text-sm font-semibold text-white hover:bg-nck-greenDark disabled:opacity-60"
+          >
+            {exporting ? 'Exporting…' : 'Export Excel'}
+          </button>
+        </div>
       </div>
 
       {totals && (
@@ -193,6 +225,21 @@ export default function MyJobsPage() {
         </button>
       </form>
 
+      {(importMutation.isSuccess || importMutation.isError) && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            importMutation.isError
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-nck-green/20 bg-nck-greenLight text-nck-green'
+          }`}
+          role={importMutation.isError ? 'alert' : 'status'}
+        >
+          {importMutation.isError
+            ? getApiError(importMutation.error, 'MyJobs import failed.')
+            : `Imported MyJobs applications: created ${importMutation.data.data.created}, enriched ${importMutation.data.data.enriched}, skipped ${importMutation.data.data.skipped}, failed ${importMutation.data.data.failed}.`}
+        </div>
+      )}
+
       {(listQuery.isError || exportError) && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {exportError || getApiError(listQuery.error, 'Unable to load MyJobs list.')}
@@ -232,6 +279,13 @@ export default function MyJobsPage() {
                 <td className="px-3 py-2">
                   <p className="font-medium text-nck-slate">{cell(row.name)}</p>
                   <p className="text-xs text-slate-500">{cell(row.education)}</p>
+                  {(row.gender || row.age || row.score) && (
+                    <p className="text-xs text-slate-500">
+                      {[row.gender, row.age, row.score ? `score ${row.score}` : null]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   <p>{cell(row.email)}</p>

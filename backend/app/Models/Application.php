@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -132,5 +133,20 @@ class Application extends Model
     public function isDuplicateHidden(): bool
     {
         return $this->duplicate_hidden_at !== null;
+    }
+
+    /**
+     * Mailbox / job-board applications used in the official long listing.
+     */
+    public function scopeNotMyJobs(Builder $query, string $column = 'source'): Builder
+    {
+        return $query->where(function (Builder $builder) use ($column): void {
+            $builder->whereNull($column)->orWhere($column, '!=', 'myjobs');
+        });
+    }
+
+    public function scopeMyJobs(Builder $query, string $column = 'source'): Builder
+    {
+        return $query->where($column, 'myjobs');
     }
 }

@@ -33,6 +33,7 @@ class ReportController extends Controller
         $monthStart = $now->copy()->startOfMonth()->utc();
 
         $byStatusQuery = Application::query()
+            ->notMyJobs()
             ->select('status', DB::raw('COUNT(*) as total'))
             ->groupBy('status');
 
@@ -41,6 +42,7 @@ class ReportController extends Controller
         $byStatus = $byStatusQuery->pluck('total', 'status');
 
         $byPositionQuery = Application::query()
+            ->notMyJobs('applications.source')
             ->leftJoin('positions', 'positions.id', '=', 'applications.position_id')
             ->select(
                 'applications.position_id',
@@ -70,11 +72,14 @@ class ReportController extends Controller
                 'total' => (int) $row->total,
             ]);
 
-        $weekQuery = Application::query()->where('received_at', '>=', $weekStart);
+        $weekQuery = Application::query()->notMyJobs()->where('received_at', '>=', $weekStart);
         $this->positionScope->scopeApplicationsQuery($weekQuery);
 
-        $monthQuery = Application::query()->where('received_at', '>=', $monthStart);
+        $monthQuery = Application::query()->notMyJobs()->where('received_at', '>=', $monthStart);
         $this->positionScope->scopeApplicationsQuery($monthQuery);
+
+        $myJobsQuery = Application::query()->myJobs();
+        $this->positionScope->scopeApplicationsQuery($myJobsQuery);
 
         $payload = [
             'counts_by_status' => $byStatus,
@@ -82,6 +87,7 @@ class ReportController extends Controller
             'email_duplicates' => $this->longListing->emailDuplicatesSummary(),
             'applications_this_week' => $weekQuery->count(),
             'applications_this_month' => $monthQuery->count(),
+            'myjobs_total' => $myJobsQuery->count(),
             'generated_at' => NairobiDate::iso($now),
         ];
 
@@ -106,9 +112,11 @@ class ReportController extends Controller
 
     public function longListing(Request $request): JsonResponse
     {
-        // Landing index: one row per category (no full applicant dump).
+        $source = $this->listingSource($request);
+        $this->longListing->usingSource($source);
+
         $report = $this->longListing->categoryIndex(
-            $request->boolean('include_unassigned', true),
+            $source !== 'myjobs' && $request->boolean('include_unassigned', true),
         );
 
         return ApiResponse::success($report);
@@ -124,6 +132,8 @@ class ReportController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
+
+        $this->longListing->usingSource($this->listingSource($request));
 
         $payload = $this->longListing->paginateCategory(
             $category,
@@ -149,7 +159,10 @@ class ReportController extends Controller
             'match' => ['nullable', 'string', 'max:32'],
             'include_unassigned' => ['nullable', 'boolean'],
             'unassigned_only' => ['nullable', 'boolean'],
+            'source' => ['nullable', 'string', 'in:mailbox,myjobs'],
         ]);
+
+        $this->longListing->usingSource($this->listingSource($request));
 
         $headers = $this->longListing->csvHeaders();
 
@@ -179,8 +192,12 @@ class ReportController extends Controller
         }
 
         $stamp = now()->timezone(NairobiDate::TZ)->format('Ymd_His');
-        $filename = 'nck_long_listing_'.preg_replace('/[^A-Za-z0-9_\-]+/', '_', $suffix)."_{$stamp}.xls";
+        $sourcePrefix = $this->longListing->listingSource() === 'myjobs' ? 'nck_myjobs_long_listing_' : 'nck_long_listing_';
+        $filename = $sourcePrefix.preg_replace('/[^A-Za-z0-9_\-]+/', '_', $suffix)."_{$stamp}.xls";
         $subtitle = count($rows).' applicant row(s)';
+        if ($this->longListing->listingSource() === 'myjobs') {
+            $subtitle .= ' · MyJobs applications';
+        }
         if (! empty($validated['q'])) {
             $subtitle .= ' · search “'.$validated['q'].'”';
         }
@@ -193,7 +210,10 @@ class ReportController extends Controller
 
         $commentKey = 'Comments/Remarks-- for PWD must indicated or attach in the certificates';
 
-        return (new NckReportExcel('Long listing', $subtitle))
+        return (new NckReportExcel(
+            $this->longListing->listingSource() === 'myjobs' ? 'MyJobs long listing' : 'Long listing',
+            $subtitle,
+        ))
             ->addSheet('Long listing', $headers, $rows, [
                 'highlight' => function (array $row) use ($commentKey): ?string {
                     $comments = strtolower((string) ($row[$commentKey] ?? ''));
@@ -343,5 +363,10 @@ class ReportController extends Controller
                 'highlight' => fn (): string => 'duplicate',
             ])
             ->download($filename);
+    }
+
+    private function listingSource(Request $request): string
+    {
+        return $request->query('source') === 'myjobs' ? 'myjobs' : 'mailbox';
     }
 }

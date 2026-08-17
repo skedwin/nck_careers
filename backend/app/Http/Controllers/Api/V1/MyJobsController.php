@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Services\MyJobs\MyJobsImportService;
 use App\Services\MyJobs\MyJobsListingService;
 use App\Support\ApiResponse;
 use App\Support\Excel\NckReportExcel;
@@ -13,8 +14,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MyJobsController extends Controller
 {
-    public function __construct(private readonly MyJobsListingService $myJobs)
-    {
+    public function __construct(
+        private readonly MyJobsListingService $myJobs,
+        private readonly MyJobsImportService $importer,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -36,6 +39,25 @@ class MyJobsController extends Controller
         );
 
         return ApiResponse::success($payload);
+    }
+
+    public function import(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'overwrite' => ['sometimes', 'boolean'],
+            'dry_run' => ['sometimes', 'boolean'],
+        ]);
+
+        $result = $this->importer->import(
+            (bool) ($validated['overwrite'] ?? false),
+            (bool) ($validated['dry_run'] ?? false),
+        );
+
+        $message = $result['dry_run']
+            ? 'Dry run complete — no records written.'
+            : 'MyJobs applications imported and profiles extracted.';
+
+        return ApiResponse::success($result, $message);
     }
 
     public function export(Request $request): StreamedResponse

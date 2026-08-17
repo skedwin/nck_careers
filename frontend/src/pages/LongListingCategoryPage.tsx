@@ -46,6 +46,8 @@ export default function LongListingCategoryPage() {
   const { categoryKey = '' } = useParams<{ categoryKey: string }>();
   const key = decodeURIComponent(categoryKey);
   const [searchParams] = useSearchParams();
+  const listingSource = searchParams.get('source') === 'myjobs' ? 'myjobs' : 'mailbox';
+  const isMyJobs = listingSource === 'myjobs';
   const initialDuplicates = ['duplicates', 'unique'].includes(searchParams.get('duplicates') ?? '')
     ? (searchParams.get('duplicates') as string)
     : '';
@@ -66,8 +68,8 @@ export default function LongListingCategoryPage() {
   const [exportError, setExportError] = useState<string | null>(null);
 
   const queryKey = useMemo(
-    () => ['reports-long-listing-category', key, page, search, qualification, duplicates, match] as const,
-    [key, page, search, qualification, duplicates, match],
+    () => ['reports-long-listing-category', key, listingSource, page, search, qualification, duplicates, match] as const,
+    [key, listingSource, page, search, qualification, duplicates, match],
   );
 
   const detailQuery = useQuery({
@@ -84,6 +86,7 @@ export default function LongListingCategoryPage() {
             qualification: qualification || undefined,
             duplicates: duplicates || undefined,
             match: match || undefined,
+            source: isMyJobs ? 'myjobs' : undefined,
           },
         },
       );
@@ -100,12 +103,13 @@ export default function LongListingCategoryPage() {
       if (qualification) params.set('qualification', qualification);
       if (duplicates) params.set('duplicates', duplicates);
       if (match) params.set('match', match);
+      if (isMyJobs) params.set('source', 'myjobs');
       const code =
         detailQuery.data?.category.reference_code?.replace('/', '-') ??
         (key === 'unassigned' ? 'unassigned' : key);
       await downloadAuthorized(
         `/reports/long-listing/export?${params.toString()}`,
-        `nck_long_listing_${code}_${Date.now()}.xls`,
+        `${isMyJobs ? 'nck_myjobs' : 'nck'}_long_listing_${code}_${Date.now()}.xls`,
       );
     } catch (error) {
       setExportError(getApiError(error, 'Excel export failed.'));
@@ -152,7 +156,10 @@ export default function LongListingCategoryPage() {
           <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-nck-green">
             {category.reference_code ?? 'UNASSIGNED'}
           </p>
-          <h2 className="font-display text-3xl font-semibold text-nck-slate">{category.title}</h2>
+          <h2 className="font-display text-3xl font-semibold text-nck-slate">
+            {isMyJobs ? 'MyJobs · ' : ''}
+            {category.title}
+          </h2>
           <p className="mt-1 text-sm text-slate-600">
             {meta.total.toLocaleString()} applicant{meta.total === 1 ? '' : 's'}
             {category.duplicate_applicants != null

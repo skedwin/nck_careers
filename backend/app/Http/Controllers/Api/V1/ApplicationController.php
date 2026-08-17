@@ -65,6 +65,10 @@ class ApplicationController extends Controller
             $query->where('position_id', $positionId);
         }
 
+        if ($source = trim((string) $request->query('source', ''))) {
+            $query->where('source', $source);
+        }
+
         $this->positionScope->scopeApplicationsQuery($query);
 
         $paginator = $query->paginate((int) $request->query('per_page', 20));
@@ -489,6 +493,7 @@ class ApplicationController extends Controller
             'sources' => data_get($application->profile_extraction, 'sources', []),
             'documents_scanned' => (int) data_get($application->profile_extraction, 'documents_scanned', 0),
             'document_sources' => data_get($application->profile_extraction, 'document_sources', []),
+            'myjobs' => data_get($application->profile_extraction, 'myjobs'),
         ];
 
         if ($application->relationLoaded('position') && $application->position?->relationLoaded('criteria')) {
