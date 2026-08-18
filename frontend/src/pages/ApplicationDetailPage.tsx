@@ -144,6 +144,7 @@ export default function ApplicationDetailPage() {
   const canUpdate = user?.permissions?.includes('applications.update') ?? false;
   const canEditProfile =
     canUpdate || (user?.permissions?.includes('applications.profile.update') ?? false);
+  const canManageDuplicates = canEditProfile;
   const canReviewAi =
     canEditProfile || (user?.permissions?.includes('screening.update') ?? false);
   const queryClient = useQueryClient();
@@ -368,7 +369,7 @@ export default function ApplicationDetailPage() {
             .
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {canUpdate && (
+            {canManageDuplicates && (
               <button
                 type="button"
                 disabled={hideDuplicateMutation.isPending}
@@ -420,7 +421,7 @@ export default function ApplicationDetailPage() {
                 .
               </p>
             </div>
-            {canUpdate && hideableDuplicates.length > 0 && (
+            {canManageDuplicates && hideableDuplicates.length > 0 && (
               <button
                 type="button"
                 disabled={hideDuplicateMutation.isPending}
@@ -477,7 +478,7 @@ export default function ApplicationDetailPage() {
                 ? ` · ${hideableDuplicates.length} can be hidden (Unique Identifier kept)`
                 : ''}
             </p>
-            {canUpdate && hiddenInGroupCount > 0 && (
+            {canManageDuplicates && hiddenInGroupCount > 0 && (
               <button
                 type="button"
                 onClick={() => setShowHiddenDuplicates((open) => !open)}
@@ -497,7 +498,7 @@ export default function ApplicationDetailPage() {
                     <th className="px-3 py-2">Email</th>
                     <th className="px-3 py-2">Phone</th>
                     <th className="px-3 py-2">Match</th>
-                    {canUpdate && <th className="px-3 py-2">Action</th>}
+                    {canManageDuplicates && <th className="px-3 py-2">Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -518,7 +519,7 @@ export default function ApplicationDetailPage() {
                       <td className="px-3 py-2">{row.email ?? '—'}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{row.phone ?? '—'}</td>
                       <td className="px-3 py-2 text-slate-600">{row.match ?? '—'}</td>
-                      {canUpdate && (
+                      {canManageDuplicates && (
                         <td className="px-3 py-2 whitespace-nowrap">
                           <button
                             type="button"
@@ -552,7 +553,7 @@ export default function ApplicationDetailPage() {
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                 <tr>
-                  {canUpdate && <th className="px-3 py-2">Hide</th>}
+                  {canManageDuplicates && <th className="px-3 py-2">Hide</th>}
                   <th className="px-3 py-2">Role</th>
                   <th className="px-3 py-2">Unique Identifier</th>
                   <th className="px-3 py-2">Applicant</th>
@@ -566,7 +567,7 @@ export default function ApplicationDetailPage() {
               <tbody>
                 {relatedDuplicates.length === 0 && (
                   <tr>
-                    <td className="px-3 py-4 text-slate-500" colSpan={canUpdate ? 9 : 8}>
+                    <td className="px-3 py-4 text-slate-500" colSpan={canManageDuplicates ? 9 : 8}>
                       No duplicates match this filter.
                     </td>
                   </tr>
@@ -578,7 +579,7 @@ export default function ApplicationDetailPage() {
                       key={row.application_id}
                       className={`border-b border-slate-100 ${isCurrent ? 'bg-nck-mist/50' : ''}`}
                     >
-                      {canUpdate && (
+                      {canManageDuplicates && (
                         <td className="px-3 py-2">
                           {row.is_primary ? (
                             <span className="text-xs text-slate-400">—</span>

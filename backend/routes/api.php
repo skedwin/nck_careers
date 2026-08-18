@@ -71,7 +71,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/applications/convert-from-mailbox', [ApplicationController::class, 'convertFromMailbox'])
             ->middleware(['permission:applications.create|applications.update', 'throttle:10,1']);
         Route::post('/applications/unhide-all-duplicates', [ApplicationController::class, 'unhideAllDuplicates'])
-            ->middleware('permission:applications.update');
+            ->middleware('permission:applications.update|applications.profile.update');
         Route::get('/applications/{application}', [ApplicationController::class, 'show'])
             ->middleware('permission:applications.view');
         Route::put('/applications/{application}/profile', [ApplicationController::class, 'updateProfile'])
@@ -79,7 +79,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/applications/{application}/status', [ApplicationController::class, 'updateStatus'])
             ->middleware('permission:applications.update|applications.shortlist|applications.reject');
         Route::post('/applications/{application}/hide-duplicate', [ApplicationController::class, 'hideDuplicate'])
-            ->middleware('permission:applications.update');
+            ->middleware('permission:applications.update|applications.profile.update');
+        Route::post('/applications/{application}/unhide-duplicate', [ApplicationController::class, 'unhideDuplicate'])
+            ->middleware('permission:applications.update|applications.profile.update');
         Route::post('/applications/{application}/ai/process', [AiExtractionController::class, 'process'])
             ->middleware(['permission:screening.update|applications.update|applications.profile.update', 'throttle:20,1']);
         Route::post('/applications/{application}/ai/review', [AiExtractionController::class, 'review'])

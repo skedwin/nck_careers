@@ -61,6 +61,7 @@ class DatabaseSeeder extends Seeder
                 'applications.view', 'documents.view', 'screening.view', 'reports.view', 'settings.view',
             ],
             'Report Viewer' => [
+                // profile.update also authorizes hide/unhide duplicates on long listing
                 'reports.view',
                 'applications.view',
                 'applications.profile.update',

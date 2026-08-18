@@ -35,7 +35,7 @@ class ReportPositionUsersSeeder extends Seeder
         $role->syncPermissions([
             'reports.view',
             'applications.view',
-            'applications.profile.update',
+            'applications.profile.update', // hide/unhide duplicates on long listing
             'documents.view',
             'documents.download',
         ]);

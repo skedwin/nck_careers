@@ -252,6 +252,8 @@ class ApplicationController extends Controller
 
     public function hideDuplicate(Request $request, Application $application): JsonResponse
     {
+        $this->positionScope->assertCanAccessApplication($application);
+
         $validated = $request->validate([
             'all_related' => ['sometimes', 'boolean'],
             'application_id' => ['sometimes', 'integer', 'exists:applications,id'],
@@ -263,6 +265,7 @@ class ApplicationController extends Controller
         $target = $targetId === $application->id
             ? $application
             : Application::query()->findOrFail($targetId);
+        $this->positionScope->assertCanAccessApplication($target);
 
         $details = $this->longListing->duplicateDetailsForApplication(
             $targetId === $application->id ? $application : $target
@@ -319,6 +322,7 @@ class ApplicationController extends Controller
             if (! $row || $row->isDuplicateHidden()) {
                 continue;
             }
+            $this->positionScope->assertCanAccessApplication($row);
             $row->forceFill([
                 'duplicate_hidden_at' => now(),
                 'duplicate_hidden_by' => $request->user()?->id,
@@ -354,6 +358,8 @@ class ApplicationController extends Controller
 
     public function unhideDuplicate(Request $request, Application $application): JsonResponse
     {
+        $this->positionScope->assertCanAccessApplication($application);
+
         $validated = $request->validate([
             'application_id' => ['sometimes', 'integer', 'exists:applications,id'],
         ]);
@@ -362,6 +368,7 @@ class ApplicationController extends Controller
         $target = $targetId === $application->id
             ? $application
             : Application::query()->findOrFail($targetId);
+        $this->positionScope->assertCanAccessApplication($target);
 
         if (! $target->isDuplicateHidden()) {
             return ApiResponse::error('This application is not a hidden duplicate.', 422);
@@ -392,16 +399,16 @@ class ApplicationController extends Controller
 
     public function unhideAllDuplicates(Request $request): JsonResponse
     {
-        $count = Application::query()->whereNotNull('duplicate_hidden_at')->count();
+        $query = Application::query()->whereNotNull('duplicate_hidden_at');
+        $this->positionScope->scopeApplicationsQuery($query);
+        $count = (clone $query)->count();
 
-        Application::query()
-            ->whereNotNull('duplicate_hidden_at')
-            ->update([
-                'duplicate_hidden_at' => null,
-                'duplicate_hidden_by' => null,
-                'duplicate_of_application_id' => null,
-                'duplicate_of_reference' => null,
-            ]);
+        (clone $query)->update([
+            'duplicate_hidden_at' => null,
+            'duplicate_hidden_by' => null,
+            'duplicate_of_application_id' => null,
+            'duplicate_of_reference' => null,
+        ]);
 
         $this->auditLogger->log('application.duplicates_unhidden_all', null, null, [
             'unhidden_count' => $count,

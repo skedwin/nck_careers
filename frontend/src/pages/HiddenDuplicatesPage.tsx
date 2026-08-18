@@ -7,6 +7,7 @@ import api, {
   type Application,
   type HiddenDuplicatesReport,
 } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { formatEAT } from '../lib/dates';
 import { downloadAuthorized } from '../lib/download';
 
@@ -16,6 +17,10 @@ function cell(value: string | number | null | undefined): string {
 }
 
 export default function HiddenDuplicatesPage() {
+  const { user } = useAuth();
+  const canManageDuplicates =
+    (user?.permissions?.includes('applications.update') ?? false) ||
+    (user?.permissions?.includes('applications.profile.update') ?? false);
   const queryClient = useQueryClient();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -119,11 +124,17 @@ export default function HiddenDuplicatesPage() {
             {generatedAt ? ` · as of ${formatEAT(generatedAt)}` : ''}
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            These applications were hidden from long listing. Use <strong>Unhide</strong> for one, or{' '}
-            <strong>Unhide all</strong> to restore every row.
+            These applications were hidden from long listing.
+            {canManageDuplicates ? (
+              <>
+                {' '}
+                Use <strong>Unhide</strong> for one, or <strong>Unhide all</strong> to restore every row you can access.
+              </>
+            ) : null}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canManageDuplicates && (
           <button
             type="button"
             disabled={unhideAllMutation.isPending || total === 0}
@@ -141,6 +152,7 @@ export default function HiddenDuplicatesPage() {
           >
             {unhideAllMutation.isPending ? 'Unhiding…' : `Unhide all (${total})`}
           </button>
+          )}
           <button
             type="button"
             disabled={exporting || total === 0}
@@ -171,13 +183,13 @@ export default function HiddenDuplicatesPage() {
               <th className="px-3 py-2">Phone</th>
               <th className="px-3 py-2">Hidden at</th>
               <th className="px-3 py-2">Hidden by</th>
-              <th className="px-3 py-2">Action</th>
+              {canManageDuplicates && <th className="px-3 py-2">Action</th>}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td className="px-3 py-4 text-slate-500" colSpan={10}>
+                <td className="px-3 py-4 text-slate-500" colSpan={canManageDuplicates ? 10 : 9}>
                   No hidden duplicates yet.
                 </td>
               </tr>
@@ -217,6 +229,7 @@ export default function HiddenDuplicatesPage() {
                   <td className="px-3 py-2 whitespace-nowrap">{cell(row.phone)}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-slate-600">{formatEAT(row.hidden_at)}</td>
                   <td className="px-3 py-2">{cell(row.hidden_by)}</td>
+                  {canManageDuplicates && (
                   <td className="px-3 py-2 whitespace-nowrap">
                     <button
                       type="button"
@@ -232,6 +245,7 @@ export default function HiddenDuplicatesPage() {
                       {isUnhiding ? 'Unhiding…' : 'Unhide'}
                     </button>
                   </td>
+                  )}
                 </tr>
               );
             })}
