@@ -101,6 +101,7 @@ class MyJobsController extends Controller
             'Name',
             'Email',
             'Phone',
+            'Score',
             'Channel',
             'In system',
             'Match',
@@ -137,6 +138,7 @@ class MyJobsController extends Controller
                 $row['name'],
                 $row['email'],
                 $row['phone'],
+                $row['score'] ?? null,
                 ! empty($row['also_in_mailbox']) ? 'MyJobs + email' : 'MyJobs only',
                 $row['in_system'] ? 'Yes' : 'No',
                 $row['match'],
@@ -153,7 +155,7 @@ class MyJobsController extends Controller
         ))
             ->addSheet('MyJobs', $headers, $excelRows, [
                 'highlight' => function (array $row): ?string {
-                    $channel = strtolower((string) ($row[6] ?? ''));
+                    $channel = strtolower((string) ($row[7] ?? ''));
 
                     return str_contains($channel, 'email') ? 'duplicate' : 'found';
                 },

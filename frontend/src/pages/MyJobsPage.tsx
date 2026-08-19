@@ -314,6 +314,7 @@ export default function MyJobsPage() {
               <th className="px-3 py-2">SN.</th>
               <th className="px-3 py-2">MyJobs applicant</th>
               <th className="px-3 py-2">Email / Phone</th>
+              <th className="px-3 py-2">Score</th>
               <th className="px-3 py-2">MyJobs list</th>
               <th className="px-3 py-2">Channel</th>
               <th className="px-3 py-2">Email application</th>
@@ -323,14 +324,14 @@ export default function MyJobsPage() {
           <tbody>
             {listQuery.isLoading && (
               <tr>
-                <td className="px-3 py-4 text-slate-500" colSpan={7}>
+                <td className="px-3 py-4 text-slate-500" colSpan={8}>
                   Loading MyJobs applicants…
                 </td>
               </tr>
             )}
             {!listQuery.isLoading && rows.length === 0 && (
               <tr>
-                <td className="px-3 py-4 text-slate-500" colSpan={7}>
+                <td className="px-3 py-4 text-slate-500" colSpan={8}>
                   No MyJobs rows match these filters.
                 </td>
               </tr>
@@ -341,11 +342,9 @@ export default function MyJobsPage() {
                 <td className="px-3 py-2">
                   <p className="font-medium text-nck-slate">{cell(row.name)}</p>
                   <p className="text-xs text-slate-500">{cell(row.education)}</p>
-                  {(row.gender || row.age || row.score) && (
+                  {(row.gender || row.age) && (
                     <p className="text-xs text-slate-500">
-                      {[row.gender, row.age, row.score ? `score ${row.score}` : null]
-                        .filter(Boolean)
-                        .join(' · ')}
+                      {[row.gender, row.age].filter(Boolean).join(' · ')}
                     </p>
                   )}
                 </td>
@@ -353,6 +352,7 @@ export default function MyJobsPage() {
                   <p>{cell(row.email)}</p>
                   <p className="text-xs text-slate-500">{cell(row.phone)}</p>
                 </td>
+                <td className="px-3 py-2 tabular-nums font-semibold text-nck-slate">{cell(row.score)}</td>
                 <td className="px-3 py-2">
                   <p className="font-semibold text-nck-green">{cell(row.mapped_position_code)}</p>
                   <p className="text-xs text-slate-500">{row.file.replace(/\.xlsx$/i, '')}</p>

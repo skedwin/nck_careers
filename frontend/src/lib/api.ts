@@ -509,6 +509,7 @@ export type LongListingRow = {
   status?: string;
   screening_status?: string;
   documents_count?: number;
+  myjobs_score?: string | number | null;
   subject?: string | null;
   notes?: string | null;
 };

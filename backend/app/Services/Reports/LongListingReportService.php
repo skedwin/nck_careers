@@ -353,6 +353,10 @@ class LongListingReportService
             'Documents',
         ];
 
+        if ($this->listingSource === self::SOURCE_MYJOBS) {
+            $headers[] = 'MyJobs Score';
+        }
+
         if ($includeCategory) {
             array_unshift($headers, 'Category Code', 'Category / Position');
         }
@@ -1209,6 +1213,7 @@ class LongListingReportService
             'status' => $application->status,
             'screening_status' => $application->screening_status,
             'documents_count' => $application->documents->count(),
+            'myjobs_score' => $this->myJobsScore($application),
             'subject' => $application->subject,
             'notes' => $application->notes,
         ];
@@ -1281,6 +1286,10 @@ class LongListingReportService
             'Documents' => (int) ($row['documents_count'] ?? 0),
         ];
 
+        if ($this->listingSource === self::SOURCE_MYJOBS) {
+            $mapped['MyJobs Score'] = $row['myjobs_score'] ?? null;
+        }
+
         if ($includeCategory) {
             return [
                 'Category Code' => $code,
@@ -1290,6 +1299,19 @@ class LongListingReportService
         }
 
         return $mapped;
+    }
+
+    /**
+     * Pull the MyJobs portal score stored on the application profile.
+     */
+    private function myJobsScore(Application $application): ?string
+    {
+        $score = data_get($application->profile_extraction, 'myjobs.score');
+        if ($score === null || $score === '') {
+            return null;
+        }
+
+        return is_scalar($score) ? trim((string) $score) : null;
     }
 
     /**

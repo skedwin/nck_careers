@@ -345,6 +345,7 @@ export default function LongListingCategoryPage() {
               <th className="px-2 py-2 min-w-[10rem]">Professional Membership</th>
               <th className="px-2 py-2 min-w-[9rem]">Proficiency in Computer Studies</th>
               <th className="px-2 py-2 whitespace-nowrap">Years of Experience</th>
+              {isMyJobs && <th className="px-2 py-2 whitespace-nowrap">MyJobs Score</th>}
               <th className="px-2 py-2 whitespace-nowrap">Documents</th>
               <th className="px-2 py-2 min-w-[12rem]">Comments/Remarks (PWD)</th>
             </tr>
@@ -352,7 +353,7 @@ export default function LongListingCategoryPage() {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td className="px-3 py-4 text-slate-500" colSpan={16}>
+                <td className="px-3 py-4 text-slate-500" colSpan={isMyJobs ? 17 : 16}>
                   {hasFilters ? 'No applicants match these filters.' : 'No applicants in this category yet.'}
                 </td>
               </tr>
@@ -397,6 +398,11 @@ export default function LongListingCategoryPage() {
                 <td className="px-2 py-2">{cell(row.professional_membership)}</td>
                 <td className="px-2 py-2">{cell(row.computer_proficiency)}</td>
                 <td className="px-2 py-2 tabular-nums">{cell(row.experience_years)}</td>
+                {isMyJobs && (
+                  <td className="px-2 py-2 tabular-nums font-semibold text-nck-slate">
+                    {cell(row.myjobs_score)}
+                  </td>
+                )}
                 <td className="px-2 py-2 tabular-nums">
                   {(row.documents_count ?? 0) > 0 ? (
                     <Link
