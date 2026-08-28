@@ -497,6 +497,7 @@ class MyJobsAttachmentLinker
         $label = mb_strtolower($name);
         $label = str_replace(['sectretary', 'communications', 'corporation secretary'], ['secretary', 'communication', 'corporate secretary'], $label);
         $label = str_replace(['&', ',', '.', '/', '-', '_'], ' ', $label);
+        $label = preg_replace('/\b(and|of|the)\b/u', ' ', $label) ?? $label;
         $label = preg_replace('/\s+/', ' ', $label) ?? $label;
 
         return trim($label);

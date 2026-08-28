@@ -122,6 +122,14 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/shortlisting', [ShortlistController::class, 'index'])
             ->middleware('permission:applications.view|applications.shortlist');
+        Route::get('/shortlisting/summary', [ShortlistController::class, 'summary'])
+            ->middleware('permission:applications.view|applications.shortlist');
+        Route::get('/shortlisting/grouped', [ShortlistController::class, 'grouped'])
+            ->middleware('permission:applications.view|applications.shortlist');
+        Route::get('/shortlisting/export/excel', [ShortlistController::class, 'exportExcel'])
+            ->middleware('permission:applications.view|applications.shortlist');
+        Route::get('/shortlisting/export/pdf', [ShortlistController::class, 'exportPdf'])
+            ->middleware('permission:applications.view|applications.shortlist');
         Route::post('/shortlisting/{application}', [ShortlistController::class, 'shortlist'])
             ->middleware('permission:applications.shortlist');
 

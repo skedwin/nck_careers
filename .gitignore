@@ -25,3 +25,10 @@ backend/storage/*.key
 backend/storage/pail
 backend/bootstrap/cache/*.php
 !backend/bootstrap/cache/.gitignore
+
+# Local tooling and exports (never commit)
+.tools/
+composer.phar
+exports/
+exports.zip
+backend/scripts/

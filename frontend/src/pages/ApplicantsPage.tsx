@@ -70,7 +70,7 @@ export default function ApplicantsPage() {
               <th className="px-2 py-2">Name</th>
               <th className="px-2 py-2">Email</th>
               <th className="px-2 py-2">Phone</th>
-              <th className="px-2 py-2">Registration</th>
+              <th className="px-2 py-2">Gender</th>
               <th className="px-2 py-2">County</th>
             </tr>
           </thead>
@@ -98,7 +98,7 @@ export default function ApplicantsPage() {
                 </td>
                 <td className="px-2 py-2">{item.email ?? '—'}</td>
                 <td className="px-2 py-2">{item.phone ?? '—'}</td>
-                <td className="px-2 py-2">{item.registration_number ?? '—'}</td>
+                <td className="px-2 py-2">{item.gender ?? '—'}</td>
                 <td className="px-2 py-2">{item.county ?? '—'}</td>
               </tr>
             ))}

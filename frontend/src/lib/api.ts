@@ -257,6 +257,29 @@ export type ApplicationSummary = {
   ai_extraction_status?: string | null;
 };
 
+export type ShortlistingPositionSummary = {
+  position_id: number | null;
+  reference_code?: string | null;
+  title: string;
+  total: number;
+  shortlisted: number;
+  queue: number;
+};
+
+export type ShortlistingPositionGroup = {
+  position_id: number | null;
+  reference_code?: string | null;
+  title: string;
+  total: number;
+  candidates: ApplicationSummary[];
+};
+
+export type ShortlistingGrouped = {
+  positions: ShortlistingPositionGroup[];
+  total: number;
+  generated_at?: string | null;
+};
+
 export type ApplicationProfile = {
   nature_of_application?: string | null;
   nature_of_application_detail?: string | null;

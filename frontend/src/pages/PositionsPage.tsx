@@ -120,6 +120,7 @@ export default function PositionsPage() {
             <tr>
               <th className="px-2 py-2">Ref</th>
               <th className="px-2 py-2">Title</th>
+              <th className="px-2 py-2">Grade</th>
               <th className="px-2 py-2">Department</th>
               <th className="px-2 py-2">Vacancies</th>
               <th className="px-2 py-2">Status</th>
@@ -145,6 +146,7 @@ export default function PositionsPage() {
               <tr key={item.id} className="border-b border-slate-100">
                 <td className="px-2 py-2 font-semibold text-nck-green">{item.reference_code}</td>
                 <td className="px-2 py-2 font-medium text-nck-slate">{item.title}</td>
+                <td className="px-2 py-2">{item.grade ?? '—'}</td>
                 <td className="px-2 py-2">{item.department ?? '—'}</td>
                 <td className="px-2 py-2 tabular-nums">{item.vacancies ?? 1}</td>
                 <td className="px-2 py-2">{item.status}</td>

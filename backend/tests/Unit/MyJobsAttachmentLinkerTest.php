@@ -18,6 +18,8 @@ class MyJobsAttachmentLinkerTest extends TestCase
         $this->assertSame('NCK/REC4', $linker->positionCodeForFolder('Deputy Director research,strategy,planning & performance Mgt'));
         $this->assertSame('NCK/REC3', $linker->positionCodeForFolder('Director Corporate services'));
         $this->assertSame('NCK/REC1', $linker->positionCodeForFolder('Director Registration & Licensing'));
+        $this->assertSame('NCK/REC8', $linker->positionCodeForFolder('Registration and Licensing Officer'));
+        $this->assertSame('NCK/REC9', $linker->positionCodeForFolder('Education and Examination Officer'));
     }
 
     public function test_reads_applicant_name_from_numbered_and_profile_filenames(): void
